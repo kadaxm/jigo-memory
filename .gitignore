@@ -1,0 +1,12 @@
+# secrets — never commit
+.env
+
+# local vector DB (machine-specific)
+chroma_memory/
+
+# audio artifacts (incl. personal voice samples)
+*.wav
+
+# python cruft
+__pycache__/
+.venv/
