@@ -86,6 +86,7 @@ FastAPI service; fixed-seed eval/benchmark suites for reproducible numbers.
 |---|---|
 | `memory.py` | Core: ChromaDB storage, salience, typing, conflict resolution, hybrid ranking, associative hop |
 | `jigo_voice.py` | Full voice loop: record → transcribe/classify → route → stream-speak |
+| `web_ui.py` + `static/index.html` | Browser dashboard: hold-to-talk voice console, memory ledger with salience/decay meters, delete |
 | `api.py` | FastAPI service exposing `/add`, `/search`, `/health` |
 | `clone_voice.py` | One-time ElevenLabs Instant Voice Cloning setup (requires paid plan; stock voice used by default) |
 | `benchmark.py` | P50/P95 retrieval latency over 20 queries against a seeded store |
@@ -111,6 +112,7 @@ Run:
 
 ```bash
 python jigo_voice.py        # full spoken loop (Enter to talk)
+python web_ui.py            # browser dashboard -> http://127.0.0.1:8000
 python memory.py            # text CLI: 'add: <text>' to store, type to search
 python benchmark.py         # latency P50/P95
 python eval.py              # accuracy + adversarial gate tests
@@ -121,6 +123,12 @@ python clone_voice.py       # optional: clone your own voice (paid plan required
 
 First run downloads the embedding model (~420 MB). The vector store persists locally
 to `./chroma_memory/`.
+
+The dashboard records through the browser's own mic (Web Audio → 16 kHz WAV), so it
+works on any device that can reach the server; browsers only grant mic access on
+`localhost` or HTTPS. Each turn shows its telemetry — transcribe / memory / TTS ms,
+and the raw-similarity gate score for recalls — and the ledger renders every memory's
+salience plus a live retention meter computed from its type's decay half-life.
 
 ## Notes & trade-offs
 

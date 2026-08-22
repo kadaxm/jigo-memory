@@ -70,16 +70,43 @@ genai_client = genai.Client(api_key=GEMINI_API_KEY)
 
 # ---------- LLM helpers ----------
 
+def _gemini_clients():
+    """All configured Gemini clients (GEMINI_API_KEY, then _2, _3...) for quota rotation."""
+    keys = []
+    if GEMINI_API_KEY:
+        keys.append(GEMINI_API_KEY)
+    i = 2
+    while True:
+        k = os.getenv(f"GEMINI_API_KEY_{i}")
+        if not k:
+            break
+        keys.append(k)
+        i += 1
+    return [genai.Client(api_key=k) for k in keys]
+
+
 def _llm_judge(prompt):
-    response = genai_client.models.generate_content(
-        model="models/gemini-3-flash-preview",
-        contents=[prompt],
-        config=types.GenerateContentConfig(temperature=0),
-    )
-    raw = response.text.strip()
-    if raw.startswith("```"):
-        raw = raw.strip("`").replace("json", "", 1).strip()
-    return json.loads(raw)
+    last_err = None
+    for client in (_gemini_clients() or [genai_client]):
+        try:
+            response = client.models.generate_content(
+                model="models/gemini-3-flash-preview",
+                contents=[prompt],
+                config=types.GenerateContentConfig(temperature=0),
+            )
+            raw = response.text.strip()
+            if raw.startswith("```"):
+                raw = raw.strip("`").replace("json", "", 1).strip()
+            return json.loads(raw)
+        except Exception as e:
+            msg = str(e)
+            if "429" in msg or "RESOURCE_EXHAUSTED" in msg or "quota" in msg.lower():
+                last_err = e
+                continue  # this key is out -> try the next
+            raise
+    if last_err:
+        raise last_err
+    raise RuntimeError("No Gemini API keys configured")
 
 
 def _score_salience(content):

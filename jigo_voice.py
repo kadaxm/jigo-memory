@@ -10,7 +10,7 @@ from google import genai
 from google.genai import types
 from elevenlabs.client import ElevenLabs
 
-from memory import add_memory, search_memory
+from memory import _gemini_clients, add_memory, search_memory
 from dotenv import load_dotenv
 import os
 
@@ -58,18 +58,68 @@ def transcribe_and_classify(filepath):
         "or 'recall' (they are asking a question about something you might already know). "
         'Respond ONLY with JSON in this exact format: {"intent": "store or recall", "text": "cleaned transcription"}'
     )
-    response = genai_client.models.generate_content(
-        model="models/gemini-3-flash-preview",
-        contents=[
-            types.Part.from_bytes(data=audio_bytes, mime_type="audio/wav"),
-            prompt
-        ],
-        config=types.GenerateContentConfig(temperature=0),
-    )
-    raw = response.text.strip()
-    if raw.startswith("```"):
-        raw = raw.strip("`").replace("json", "", 1).strip()
-    return json.loads(raw)
+    contents = [
+        types.Part.from_bytes(data=audio_bytes, mime_type="audio/wav"),
+        prompt
+    ]
+    last_err = None
+    for client in (_gemini_clients() or [genai_client]):
+        try:
+            response = client.models.generate_content(
+                model="models/gemini-3-flash-preview",
+                contents=contents,
+                config=types.GenerateContentConfig(temperature=0),
+            )
+            raw = response.text.strip()
+            if raw.startswith("```"):
+                raw = raw.strip("`").replace("json", "", 1).strip()
+            return json.loads(raw)
+        except Exception as e:
+            msg = str(e)
+            if "429" in msg or "RESOURCE_EXHAUSTED" in msg or "quota" in msg.lower():
+                last_err = e
+                continue  # this key is out -> try the next
+            raise
+    if last_err:
+        raise last_err
+    raise RuntimeError("No Gemini API keys configured")
+
+
+def _keyword_intent(text):
+    """Offline intent classification for the quota fallback path."""
+    t = text.lower().strip()
+    if not t:
+        return "recall"
+    if t.startswith(("remember", "note that", "keep in mind", "yaad rakho", "yaad rakhna")):
+        return "store"
+    first = t.split()[0]
+    if t.endswith("?") or first in (
+        "what", "where", "when", "who", "why", "how", "which",
+        "kya", "kahan", "kab", "kaun", "kyun", "kaise",
+    ):
+        return "recall"
+    return "store"  # default: they are telling it something
+
+
+def transcribe_and_classify_with_fallback(filepath):
+    """Gemini first; on daily-quota exhaustion, ElevenLabs Scribe + keyword rules."""
+    try:
+        return transcribe_and_classify(filepath)
+    except Exception as e:
+        msg = str(e)
+        if "429" not in msg and "RESOURCE_EXHAUSTED" not in msg and "quota" not in msg.lower():
+            raise
+        print("[gemini quota exhausted -> falling back to ElevenLabs Scribe + keyword intent]")
+        with open(filepath, 'rb') as f:
+            audio_bytes = f.read()
+        resp = eleven_client.speech_to_text.convert(
+            model_id="scribe_v1",
+            file=audio_bytes,
+        )
+        text = (resp.text or "").strip()
+        if text.lower().startswith(("you,", "okay.", "thank you.")) and len(text) < 10:
+            text = ""  # scribe sometimes emits filler on near-empty clips
+        return {"intent": _keyword_intent(text), "text": text}
 
 
 def speak(text):
@@ -122,7 +172,7 @@ def handle_turn():
     if filepath is None:
         speak("I didn't catch that, try again.")
         return
-    result = transcribe_and_classify(filepath)
+    result = transcribe_and_classify_with_fallback(filepath)
     intent = result.get("intent")
     text = result.get("text", "").strip()
     print(f"Heard ({intent}): {text}")
