@@ -4,6 +4,7 @@ import numpy as np
 import sounddevice as sd
 import wave
 import json
+import re
 import winsound
 
 from google import genai
@@ -115,29 +116,96 @@ ANSWER_GATE = 0.45
 REFUSAL = "I don't have anything on that yet."
 
 
+QUESTION_WORDS = ("what", "where", "when", "who", "why", "how", "which",
+                  "is", "are", "do", "does", "did", "can", "could", "will",
+                  "would", "should", "kya", "kahan", "kab", "kaun", "kyun", "kaise")
+STRONG_STORE = ("remember that", "note that", "keep in mind", "yaad rakho",
+                "yaad rakhna", "make a note", "store this")
+
+
+def looks_like_question(text):
+    """Hard guard: pure questions must never be stored, even if intent misfires.
+    'remember that ...' phrasing always wins (they are telling, not asking)."""
+    t = (text or "").lower().strip()
+    if not t:
+        return False
+    if any(p in t for p in STRONG_STORE):
+        return False
+    if t.endswith("?"):
+        return True
+    first = t.split()[0] if t.split() else ""
+    return first in QUESTION_WORDS
+
+
+def _keyword_intent_strong(text):
+    """Instant intent when keyword rules give a STRONG signal; None = ambiguous."""
+    t = (text or "").lower().strip()
+    if not t:
+        return None
+    if any(p in t for p in STRONG_STORE):
+        return "store"
+    if "?" in t:
+        return "recall"
+    first = t.split()[0] if t.split() else ""
+    if first in ("what", "where", "when", "who", "why", "how", "which",
+                 "kya", "kahan", "kab", "kaun", "kyun", "kaise"):
+        return "recall"
+    return None
+
+
+def _strip_md(s):
+    """Remove markdown syntax so vault notes read as clean prose."""
+    s = re.sub(r"[*_#`>]+", "", s)
+    return " ".join(s.split())
+
+
 def compose_reply(query, results):
-    """LLM-generated conversational answer grounded ONLY in retrieved memories."""
-    mem_lines = "\n".join(f"- {r['content']}" for r in results[:5])
+    """LLM-generated conversational answer grounded ONLY in retrieved memories.
+    Meta-questions about Jigo itself get a brief in-persona answer."""
+    mem_lines = "\n".join(f"- {_strip_md(r['content'])[:300]}" for r in results[:5])
     prompt = (
         "You are Jigo, a warm voice assistant with a memory. The user asks:\n"
         f"\"{query}\"\n\n"
         "Your memories:\n" + mem_lines + "\n\n"
-        "Answer conversationally in at most 2 short spoken-style sentences, "
-        "using ONLY the memories above. Never invent facts. If the memories do "
-        "not contain the answer, respond with exactly: " + REFUSAL
+        "Rules:\n"
+        "1. If the question is about you (Jigo), this conversation, or whether you are "
+        "listening — answer briefly in persona (1 short sentence), no memories needed.\n"
+        "2. For questions about the user's life, use ONLY the memories above. Never invent. "
+        "If they do not contain the answer, respond with exactly: " + REFUSAL + "\n"
+        "3. Answer in at most 2 short spoken-style sentences.\n"
+        "4. NEVER quote or echo memory titles, headings, or markdown. Speak plain prose.\n\n"
+        "Example — memories: ['- THE REAL QUESTION ISNT WHO AM I: some essay'], "
+        "question: \"do you remember me?\" "
+        "Good answer: \"Of course I remember you — good to hear from you again!\" "
+        "Bad answer (never do this): \"THE REAL QUESTION ISNT WHO AM I: some essay\""
     )
     try:
-        out = llm.chat(
+        raw = llm.chat(
             prompt,
-            system="Answer directly. No preamble, no reasoning out loud.",
-            max_tokens=500,
-            temperature=0.5,
+            system="Answer directly in at most two short sentences. No preamble, no reasoning out loud. "
+                   "Never quote memory titles or markdown — speak plain prose.",
+            max_tokens=1500,
+            temperature=0.4,
+            timeout=14,
         )
-        out = " ".join(out.split()).strip()
-        return out or None
+        out = _strip_md(" ".join(raw.split())).strip()
+        # title-echo detector: if the model parroted a note heading, retry on fast Gemini
+        if (not out) or ("##" in raw) or (out.upper() == out and len(out) > 25):
+            print("[compose_reply: title-echo detected -> fast gemini retry]")
+            out = _strip_md(" ".join(llm.fast_gemini_chat(prompt, 600, 0.4).split())).strip()
+        if out:
+            # dedupe "TITLE: TITLE" pattern from cleaned echoes
+            if ": " in out:
+                head, rest = out.split(": ", 1)
+                if head.strip().lower() == rest.strip().lower():
+                    out = rest.strip()
+            return out
     except Exception as e:
-        print(f"[compose_reply failed ({str(e)[:80]}) -> echoing top memory]")
-        return None
+        print(f"[compose_reply failed ({str(e)[:80]})]")
+    # graceful degradation: cleaned echo of the best memory (never raw markdown)
+    top = _strip_md(results[0]["content"])[:220]
+    print("[compose_reply empty -> cleaned echo]")
+    return top or None
 
 
 def classify_intent_text(text):
@@ -159,12 +227,14 @@ def classify_intent_text(text):
     first = t.split()[0] if t.split() else ""
     if first in qwords:
         return "recall"
-    # ambiguous -> LLM
+    # ambiguous -> LLM (tight budget: tiny JSON answer, hard 5s ceiling)
     try:
         r = llm.chat_json(
             'Classify this utterance: "store" (telling you something to remember) or '
             '"recall" (asking a question about what you know). Utterance: "' + text.strip() + '". '
-            'Respond ONLY with JSON: {"intent": "store or recall"}'
+            'Respond ONLY with JSON: {"intent": "store or recall"}',
+            max_tokens=150,
+            timeout=5,
         )
         intent = r.get("intent")
         return intent if intent in ("store", "recall") else None
@@ -182,7 +252,7 @@ def transcribe_and_classify_with_fallback(filepath):
         text = (resp.text or "").strip()
         if text.lower() in ("you,", "okay.", "thank you.", "bye."):
             text = ""  # scribe filler on near-empty clips
-        intent = classify_intent_text(text) or _keyword_intent(text)
+        intent = _keyword_intent_strong(text) or classify_intent_text(text) or _keyword_intent(text)
         print("[stt: elevenlabs scribe]")
         return {"intent": intent, "text": text}
     except Exception as se:
@@ -205,8 +275,9 @@ def speak(text):
         audio_stream = eleven_client.text_to_speech.stream(
             voice_id=VOICE_ID,
             text=text,
-            model_id="eleven_multilingual_v2",
+            model_id="eleven_turbo_v2_5",
             output_format=f"pcm_{TTS_SAMPLE_RATE}",
+            optimize_streaming_latency=3,
         )
         player = sd.OutputStream(samplerate=TTS_SAMPLE_RATE, channels=1, dtype="int16")
         player.start()

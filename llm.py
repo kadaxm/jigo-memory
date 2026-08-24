@@ -19,6 +19,7 @@ OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "stealth/ox-alpha")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 GEMINI_TEXT_MODEL = os.getenv("GEMINI_TEXT_MODEL", "models/gemini-3-flash-preview")
+GEMINI_FAST_MODEL = os.getenv("GEMINI_FAST_MODEL", "models/gemini-3.5-flash-lite")
 
 from google import genai  # noqa: E402
 from google.genai import types  # noqa: E402
@@ -41,7 +42,7 @@ def _gemini_clients():
     return [genai.Client(api_key=k) for k in keys]
 
 
-def _openrouter_chat(prompt, system=None, max_tokens=500, temperature=0.4):
+def _openrouter_chat(prompt, system=None, max_tokens=500, temperature=0.4, timeout=40):
     messages = []
     if system:
         messages.append({"role": "system", "content": system})
@@ -58,28 +59,35 @@ def _openrouter_chat(prompt, system=None, max_tokens=500, temperature=0.4):
             "max_tokens": max_tokens,
             "temperature": temperature,
         },
-        timeout=40,
+        timeout=timeout,
     )
     r.raise_for_status()
     data = r.json()
     if data.get("error"):
         raise RuntimeError(f"openrouter: {data['error']}")
-    return data["choices"][0]["message"]["content"].strip()
+    content = (data["choices"][0]["message"]["content"] or "").strip()
+    if not content:
+        # reasoning models can burn the whole token budget on hidden thinking
+        # and return empty visible content — treat as a failure so the
+        # fallback provider answers instead.
+        raise RuntimeError("openrouter: empty content (reasoning exhausted tokens)")
+    return content
 
 
-def _gemini_chat(prompt, max_tokens=500, temperature=0.4):
+def _gemini_chat(prompt, max_tokens=500, temperature=0.4, model=None):
+    model = model or GEMINI_TEXT_MODEL
     last_err = None
     for client in _gemini_clients():
         try:
             response = client.models.generate_content(
-                model=GEMINI_TEXT_MODEL,
+                model=model,
                 contents=[prompt],
                 config=types.GenerateContentConfig(
                     temperature=temperature,
                     max_output_tokens=max_tokens,
                 ),
             )
-            return response.text.strip()
+            return (response.text or "").strip()
         except Exception as e:
             msg = str(e)
             last_err = e
@@ -91,13 +99,20 @@ def _gemini_chat(prompt, max_tokens=500, temperature=0.4):
     raise RuntimeError("No Gemini API keys configured")
 
 
-def chat(prompt, system=None, max_tokens=900, temperature=0.4):
+def fast_gemini_chat(prompt, max_tokens=600, temperature=0.4):
+    """Gemini on the fast stable lite model — used when the primary provider
+    returns low-quality output and speed matters."""
+    return _gemini_chat(prompt, max_tokens, temperature, model=GEMINI_FAST_MODEL)
+
+
+def chat(prompt, system=None, max_tokens=500, temperature=0.4, timeout=40):
     """Plain-text completion. OpenRouter primary, Gemini fallback.
-    max_tokens kept generous: reasoning models spend hidden tokens before visible output."""
+    timeout: hard ceiling for the OpenRouter attempt (seconds) — on timeout the
+    Gemini fallback answers instead, so a slow provider can never stall the loop."""
     errors = []
     if OPENROUTER_API_KEY:
         try:
-            return _openrouter_chat(prompt, system, max_tokens, temperature)
+            return _openrouter_chat(prompt, system, max_tokens, temperature, timeout)
         except Exception as e:
             errors.append(f"openrouter: {e}")
     try:
@@ -107,10 +122,19 @@ def chat(prompt, system=None, max_tokens=900, temperature=0.4):
     raise RuntimeError(" | ".join(errors))
 
 
-def chat_json(prompt, system=None, max_tokens=500, temperature=0.2):
-    """chat() that must return parseable JSON (handles ```json fences)."""
-    raw = chat(prompt, system, max_tokens, temperature)
+def chat_json(prompt, system=None, max_tokens=500, temperature=0.2, timeout=40):
+    """chat() that must return JSON. Tolerates ``` fences AND trailing junk
+    after the first JSON object (some models append commentary)."""
+    raw = chat(prompt, system, max_tokens, temperature, timeout)
     raw = raw.strip()
     if raw.startswith("```"):
         raw = raw.strip("`").replace("json", "", 1).strip()
-    return json.loads(raw)
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        dec = json.JSONDecoder()
+        for i, ch in enumerate(raw):
+            if ch in "{[":
+                obj, _ = dec.raw_decode(raw[i:])
+                return obj
+        raise

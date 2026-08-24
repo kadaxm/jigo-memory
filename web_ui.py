@@ -9,6 +9,7 @@ Run:  python web_ui.py     ->  http://127.0.0.1:8000
 
 import base64
 import os
+import re
 import tempfile
 import time
 
@@ -17,7 +18,7 @@ from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
 from llm import _gemini_clients
-from jigo_voice import (ANSWER_GATE, REFUSAL, VOICE_ID,
+from jigo_voice import (ANSWER_GATE, REFUSAL, VOICE_ID, looks_like_question,
                         _keyword_intent, compose_reply, eleven_client,
                         transcribe_and_classify_with_fallback)
 from memory import TYPE_HALF_LIFE_DAYS, add_memory, collection, search_memory
@@ -79,13 +80,6 @@ def add(req: AddRequest):
     return {"id": memory_id, "status": "stored"}
 
 
-LAB_ENGINES = [
-    ("gemini", "models/gemini-3-flash-preview", "current preview"),
-    ("gemini", "models/gemini-flash-latest", "flash latest"),
-    ("gemini", "models/gemini-3.5-flash-lite", "3.5 lite"),
-]
-
-
 def _scribe_transcribe(wav_path):
     """ElevenLabs Scribe STT. Raises on failure (e.g. restricted key)."""
     with open(wav_path, "rb") as f:
@@ -95,8 +89,8 @@ def _scribe_transcribe(wav_path):
 
 @app.post("/voice_debug")
 async def voice_debug(audio: UploadFile = File(...)):
-    """Calibration: run one utterance through every available engine, return all transcripts."""
-    from jigo_voice import transcribe_and_classify
+    """Calibration: what exactly did Scribe hear? (Scribe is production STT;
+    Gemini audio remains an invisible fallback, not a lab candidate.)"""
     raw = await audio.read()
     if not raw:
         raise HTTPException(status_code=400, detail="Empty audio upload.")
@@ -105,34 +99,19 @@ async def voice_debug(audio: UploadFile = File(...)):
         with os.fdopen(fd, "wb") as f:
             f.write(raw)
         out = []
-        # Gemini engines (each tries key rotation internally)
-        for kind, model, label in LAB_ENGINES:
-            t0 = time.perf_counter()
-            try:
-                r = transcribe_and_classify(tmp_path, model=model)
-                out.append({"engine": f"gemini {label}", "ok": True,
-                            "transcript": r.get("text", ""), "intent": r.get("intent"),
-                            "ms": round((time.perf_counter() - t0) * 1000), "error": None})
-            except Exception as e:
-                m = str(e)
-                why = "quota" if ("429" in m or "RESOURCE_EXHAUSTED" in m) else m[:120]
-                out.append({"engine": f"gemini {label}", "ok": False,
-                            "transcript": "", "intent": None,
-                            "ms": round((time.perf_counter() - t0) * 1000), "error": why})
-        # Scribe (works only with full-scope ElevenLabs key)
-        t1 = time.perf_counter()
+        t0 = time.perf_counter()
         try:
             r = _scribe_transcribe(tmp_path)
             out.append({"engine": "elevenlabs scribe", "ok": True,
                         "transcript": r.get("text", ""), "intent": r.get("intent"),
-                        "ms": round((time.perf_counter() - t1) * 1000), "error": None})
+                        "ms": round((time.perf_counter() - t0) * 1000), "error": None})
         except Exception as e:
             m = str(e)
             why = ("needs full-scope ElevenLabs key"
                    if "missing_permissions" in m else m[:120])
             out.append({"engine": "elevenlabs scribe", "ok": False,
                         "transcript": "", "intent": None,
-                        "ms": round((time.perf_counter() - t1) * 1000), "error": why})
+                        "ms": round((time.perf_counter() - t0) * 1000), "error": why})
         return {"engines": out}
     finally:
         try:
@@ -151,7 +130,8 @@ def tts(text: str):
         mp3 = b"".join(eleven_client.text_to_speech.convert(
             voice_id=VOICE_ID,
             text=text,
-            model_id="eleven_multilingual_v2",
+            model_id="eleven_turbo_v2_5",
+            optimize_streaming_latency=3,
         ))
         return Response(content=mp3, media_type="audio/mpeg")
     except Exception as e:
@@ -170,8 +150,9 @@ def tts_stream(text: str):
         yield from eleven_client.text_to_speech.stream(
             voice_id=VOICE_ID,
             text=text,
-            model_id="eleven_multilingual_v2",
+            model_id="eleven_turbo_v2_5",
             output_format="pcm_24000",
+            optimize_streaming_latency=3,
         )
 
     return StreamingResponse(gen(), media_type="application/octet-stream")
@@ -199,6 +180,14 @@ async def voice(audio: UploadFile = File(...), confirm_store: str = Form("0"), s
 
         intent = result.get("intent")
         transcript = (result.get("text") or "").strip()
+        # strip Scribe's non-speech annotations like [mouse clicking]
+        transcript = re.sub(r"\[[^\]]*\]", "", transcript)
+        transcript = " ".join(transcript.split())
+
+        # hard guard: pure questions can never be stored, even on intent misfires
+        if intent == "store" and looks_like_question(transcript):
+            print(f"[intent guard: '{transcript[:50]}' looks like a question -> recall]")
+            intent = "recall"
 
         if intent == "store" and transcript and confirm_store in ("1", "true", "True"):
             return {
@@ -254,7 +243,8 @@ async def voice(audio: UploadFile = File(...), confirm_store: str = Form("0"), s
             audio_gen = eleven_client.text_to_speech.convert(
                 voice_id=VOICE_ID,
                 text=reply_text,
-                model_id="eleven_multilingual_v2",
+                model_id="eleven_turbo_v2_5",
+                optimize_streaming_latency=3,
             )
             mp3 = b"".join(audio_gen)
             tts_ms = (time.perf_counter() - t2) * 1000

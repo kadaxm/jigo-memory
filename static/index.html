@@ -89,6 +89,8 @@
   /* ---------- feed ---------- */
   .feed{display:flex;flex-direction:column;align-items:center;width:100%;padding:12px 20px 34px;gap:14px}
   .turns{width:min(600px,94vw);max-height:36vh;overflow-y:auto;display:flex;flex-direction:column;gap:10px;scrollbar-width:thin}
+  .turns .turn:not(:first-child){opacity:.72}
+  .turns .turn:not(:first-child) .reply-line{font-size:14px}
   .empty-note{color:var(--dim);font-size:13.5px;text-align:center;margin:10px auto;line-height:1.7}
   .turn{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 17px;box-shadow:var(--shadow-sm)}
   .turn.stored-line{padding:10px 15px;font-family:var(--mono);font-size:11.5px;color:var(--green);border-style:dashed;box-shadow:none;word-break:break-word}
@@ -708,6 +710,7 @@ function renderTurn(d){
     t.appendChild(rc);
   }
   turnsEl.prepend(t);
+  turnsEl.scrollTop = 0;
   return t;
 }
 let replyAnalyser=null;const wired=new WeakSet();
