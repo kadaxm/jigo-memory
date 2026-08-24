@@ -662,13 +662,14 @@ $("btnRemember").addEventListener("click",async()=>{
   btn.disabled=false;btn.textContent="✓ REMEMBER THIS";
 });
 
-let cueUrl=null;
+let cueEl=null;
 function playCue(){
-  const go=u=>{const a=new Audio(u);a.play().catch(()=>{});};
-  if(cueUrl){go(cueUrl);return;}
+  stopAllAudio();
+  const go=u=>{const a=new Audio(u);activeEls.push(a);a.addEventListener("ended",()=>{const i=activeEls.indexOf(a);if(i>=0)activeEls.splice(i,1);});a.play().catch(()=>{});};
+  if(cueEl){go(cueEl);return;}
   fetch("/tts?text="+encodeURIComponent("Got it, I'll remember that."))
     .then(r=>{if(!r.ok)throw 0;return r.blob();})
-    .then(b=>{cueUrl=URL.createObjectURL(b);go(cueUrl);})
+    .then(b=>{cueEl=URL.createObjectURL(b);go(cueEl);})
     .catch(()=>{});
 }
 function addStoredLine(text){
@@ -729,7 +730,15 @@ function wireReplyReactivity(el){
 
 /* ---------- streaming TTS playback (pcm_24000 chunks, played live) ---------- */
 let streamCtx=null;
+const activeSrcs=[];   // scheduled WebAudio sources
+const activeEls=[];    // playing <audio> elements
+function stopAllAudio(){
+  activeSrcs.splice(0).forEach(s=>{try{s.stop()}catch(e){}});
+  activeEls.splice(0).forEach(a=>{try{a.pause()}catch(e){}});
+  orb.state="idle";
+}
 async function speakStreamed(text,turnEl){
+  stopAllAudio();
   const t0=performance.now();
   let res;
   try{res=await fetch("/tts_stream?text="+encodeURIComponent(text));}
@@ -762,6 +771,8 @@ async function speakStreamed(text,turnEl){
       const src=streamCtx.createBufferSource();
       src.buffer=buf;src.connect(streamCtx.destination);
       src.start(nextTime);
+      activeSrcs.push(src);
+      src.onended=()=>{const i=activeSrcs.indexOf(src);if(i>=0)activeSrcs.splice(i,1);};
       if(firstAt===null)firstAt=performance.now();
       nextTime+=f32.length/SR;
     }
@@ -769,10 +780,14 @@ async function speakStreamed(text,turnEl){
     const waitMs=Math.max(0,(nextTime-streamCtx.currentTime)*1000+180);
     const ttfa=Math.round(firstAt-t0);
     await new Promise(r=>setTimeout(r,waitMs));
-    orb.state="idle";setStatus("idle");
+    if(activeSrcs.length===0){orb.state="idle";setStatus("idle");}
     if(turnEl)addStreamChips(turnEl,ttfa,text);
     maybeRearm();
-  }catch(e){orb.state="idle";setStatus("idle");return fallbackSpeak(text,turnEl);}
+  }catch(e){
+    stopAllAudio();
+    orb.state="idle";setStatus("idle");
+    return fallbackSpeak(text,turnEl);
+  }
 }
 function addStreamChips(turnEl,ttfa,text){
   if(!turnEl)return;
@@ -787,14 +802,16 @@ function addStreamChips(turnEl,ttfa,text){
   chips.appendChild(b);
 }
 function fallbackSpeak(text,turnEl){
+  stopAllAudio();
   fetch("/tts?text="+encodeURIComponent(text))
     .then(r=>{if(!r.ok)throw 0;return r.blob();})
     .then(b=>{
       const a=new Audio(URL.createObjectURL(b));
+      activeEls.push(a);
       wireReplyReactivity(a);
+      a.addEventListener("ended",()=>{const i=activeEls.indexOf(a);if(i>=0)activeEls.splice(i,1);maybeRearm();});
       if(turnEl)turnEl.appendChild(a);
       a.play().catch(()=>{});
-      a.addEventListener("ended",()=>maybeRearm());
     })
     .catch(()=>{});
 }
