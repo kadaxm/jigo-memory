@@ -162,7 +162,7 @@ def _strip_md(s):
 def compose_reply(query, results):
     """LLM-generated conversational answer grounded ONLY in retrieved memories.
     Meta-questions about Jigo itself get a brief in-persona answer."""
-    mem_lines = "\n".join(f"- {_strip_md(r['content'])[:300]}" for r in results[:5])
+    mem_lines = "\n".join(f"- {_strip_md(r['content'])[:300]}" for r in results[:8])
     prompt = (
         "You are Jigo, a warm voice assistant with a memory. The user asks:\n"
         f"\"{query}\"\n\n"

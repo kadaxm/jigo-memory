@@ -212,7 +212,7 @@ async def voice(audio: UploadFile = File(...), confirm_store: str = Form("0"), s
             reply_text = "Got it, I'll remember that."
         elif intent == "recall" and transcript:
             t1 = time.perf_counter()
-            results = search_memory(transcript, top_k=5, associative=False)
+            results = search_memory(transcript, top_k=8, associative=False)
             retrieval_ms = round((time.perf_counter() - t1) * 1000)
             gate_score = round(results[0]["raw_similarity"], 3) if results else 0.0
             if results and results[0]["raw_similarity"] >= ANSWER_GATE:
