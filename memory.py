@@ -7,15 +7,13 @@ import time
 import re
 import os
 
+import llm
 from dotenv import load_dotenv
-from google import genai
-from google.genai import types
 
 # --- CONFIG ---
 load_dotenv()
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chroma_memory")
 COLLECTION_NAME = "memories"
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")  # set this in a .env file, NOT hardcoded here
 CONFLICT_SIMILARITY_THRESHOLD = 0.75
 SIMILARITY_WEIGHT = 0.6
 SALIENCE_WEIGHT = 0.25
@@ -26,6 +24,7 @@ TYPE_HALF_LIFE_DAYS = {
     "episodic": 7,      # events go stale fast
     "semantic": 30,     # facts about identity/goals stay relevant longer
     "procedural": 90,   # how-to knowledge barely decays
+    "knowledge": 365,   # imported second-brain notes (Obsidian) — reference knowledge
 }
 # -------------------------------------------
 
@@ -63,50 +62,11 @@ def _ensure_cosine_space():
 
 _ensure_cosine_space()
 
-if not GEMINI_API_KEY:
-    print("WARNING: GEMINI_API_KEY not found in environment. Create a .env file with GEMINI_API_KEY=your_key")
-genai_client = genai.Client(api_key=GEMINI_API_KEY)
-
 
 # ---------- LLM helpers ----------
 
-def _gemini_clients():
-    """All configured Gemini clients (GEMINI_API_KEY, then _2, _3...) for quota rotation."""
-    keys = []
-    if GEMINI_API_KEY:
-        keys.append(GEMINI_API_KEY)
-    i = 2
-    while True:
-        k = os.getenv(f"GEMINI_API_KEY_{i}")
-        if not k:
-            break
-        keys.append(k)
-        i += 1
-    return [genai.Client(api_key=k) for k in keys]
-
-
 def _llm_judge(prompt):
-    last_err = None
-    for client in (_gemini_clients() or [genai_client]):
-        try:
-            response = client.models.generate_content(
-                model="models/gemini-3-flash-preview",
-                contents=[prompt],
-                config=types.GenerateContentConfig(temperature=0),
-            )
-            raw = response.text.strip()
-            if raw.startswith("```"):
-                raw = raw.strip("`").replace("json", "", 1).strip()
-            return json.loads(raw)
-        except Exception as e:
-            msg = str(e)
-            if "429" in msg or "RESOURCE_EXHAUSTED" in msg or "quota" in msg.lower():
-                last_err = e
-                continue  # this key is out -> try the next
-            raise
-    if last_err:
-        raise last_err
-    raise RuntimeError("No Gemini API keys configured")
+    return llm.chat_json(prompt, max_tokens=200, temperature=0.2)
 
 
 def _score_salience(content):
