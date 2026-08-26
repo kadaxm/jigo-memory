@@ -1,0 +1,6 @@
+Judging 400 chunks (pool 3405) + 7 existing judged...
+  25/400 judged (24 ok, 1 failed) — 231s [checkpoint saved]
+  50/400 judged (49 ok, 1 failed) — 490s [checkpoint saved]
+  75/400 judged (73 ok, 2 failed) — 743s [checkpoint saved]
+  100/400 judged (97 ok, 3 failed) — 976s [checkpoint saved]
+  125/400 judged (122 ok, 3 failed) — 1255s [checkpoint saved]

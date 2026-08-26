@@ -42,6 +42,31 @@ def _gemini_clients():
     return [genai.Client(api_key=k) for k in keys]
 
 
+# Circuit breaker: after repeated OpenRouter failures, skip it entirely for a
+# cooldown window (Gemini serves everything) — then probe it again automatically.
+_OR_FAILS = 0
+_OR_SKIP_UNTIL = 0.0
+_OR_THRESHOLD = 3
+_OR_COOLDOWN = 600  # seconds
+
+
+def _openrouter_available():
+    import time as _t
+    return _t.time() >= _OR_SKIP_UNTIL
+
+
+def _note_or_result(ok):
+    global _OR_FAILS, _OR_SKIP_UNTIL
+    import time as _t
+    if ok:
+        _OR_FAILS = 0
+        _OR_SKIP_UNTIL = 0.0
+    else:
+        _OR_FAILS += 1
+        if _OR_FAILS >= _OR_THRESHOLD:
+            _OR_SKIP_UNTIL = _t.time() + _OR_COOLDOWN
+
+
 def _openrouter_chat(prompt, system=None, max_tokens=500, temperature=0.4, timeout=40):
     messages = []
     if system:
@@ -64,13 +89,16 @@ def _openrouter_chat(prompt, system=None, max_tokens=500, temperature=0.4, timeo
     r.raise_for_status()
     data = r.json()
     if data.get("error"):
+        _note_or_result(False)
         raise RuntimeError(f"openrouter: {data['error']}")
     content = (data["choices"][0]["message"]["content"] or "").strip()
     if not content:
         # reasoning models can burn the whole token budget on hidden thinking
         # and return empty visible content — treat as a failure so the
         # fallback provider answers instead.
+        _note_or_result(False)
         raise RuntimeError("openrouter: empty content (reasoning exhausted tokens)")
+    _note_or_result(True)
     return content
 
 
@@ -105,15 +133,21 @@ def fast_gemini_chat(prompt, max_tokens=600, temperature=0.4):
     return _gemini_chat(prompt, max_tokens, temperature, model=GEMINI_FAST_MODEL)
 
 
-def chat(prompt, system=None, max_tokens=500, temperature=0.4, timeout=40):
+def chat(prompt, system=None, max_tokens=500, temperature=0.4, timeout=40, model_hint=None):
     """Plain-text completion. OpenRouter primary, Gemini fallback.
     timeout: hard ceiling for the OpenRouter attempt (seconds) — on timeout the
-    Gemini fallback answers instead, so a slow provider can never stall the loop."""
+    Gemini fallback answers instead, so a slow provider can never stall the loop.
+    model_hint="fast_gemini": skip OpenRouter, use the fast stable Gemini model."""
+    if model_hint == "fast_gemini":
+        return _gemini_chat(prompt, max_tokens, temperature, model=GEMINI_FAST_MODEL)
     errors = []
-    if OPENROUTER_API_KEY:
+    if OPENROUTER_API_KEY and _openrouter_available():
         try:
-            return _openrouter_chat(prompt, system, max_tokens, temperature, timeout)
+            out = _openrouter_chat(prompt, system, max_tokens, temperature, timeout)
+            _note_or_result(True)
+            return out
         except Exception as e:
+            _note_or_result(False)
             errors.append(f"openrouter: {e}")
     try:
         return _gemini_chat(prompt, max_tokens, temperature)
@@ -122,10 +156,10 @@ def chat(prompt, system=None, max_tokens=500, temperature=0.4, timeout=40):
     raise RuntimeError(" | ".join(errors))
 
 
-def chat_json(prompt, system=None, max_tokens=500, temperature=0.2, timeout=40):
+def chat_json(prompt, system=None, max_tokens=500, temperature=0.2, timeout=40, model_hint=None):
     """chat() that must return JSON. Tolerates ``` fences AND trailing junk
     after the first JSON object (some models append commentary)."""
-    raw = chat(prompt, system, max_tokens, temperature, timeout)
+    raw = chat(prompt, system, max_tokens, temperature, timeout, model_hint)
     raw = raw.strip()
     if raw.startswith("```"):
         raw = raw.strip("`").replace("json", "", 1).strip()

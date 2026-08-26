@@ -93,7 +93,12 @@ def main():
     print(f"Found {len(md_files)} markdown notes in vault.")
 
     added = updated_notes = unchanged = empty = 0
-    batch_ids, batch_docs, batch_metas = [], [], []
+    batch_ids, batch_docs, batch_embs, batch_metas = [], [], [], []
+    try:
+        from salience_model import predict_salience
+        _model_salience = True
+    except Exception:
+        _model_salience = False
 
     def flush():
         nonlocal added
@@ -101,12 +106,12 @@ def main():
             return
         col.add(
             ids=batch_ids,
-            embeddings=[model.encode(d).tolist() for d in batch_docs],
+            embeddings=batch_embs,
             documents=batch_docs,
             metadatas=batch_metas,
         )
         added += len(batch_ids)
-        batch_ids.clear(); batch_docs.clear(); batch_metas.clear()
+        batch_ids.clear(); batch_docs.clear(); batch_embs.clear(); batch_metas.clear()
 
     for path in md_files:
         rel = os.path.relpath(path, VAULT).replace("\\", "/")
@@ -134,10 +139,18 @@ def main():
                 continue
             known_hashes.add(h)
             doc = f"{title}: {seg}" if title and title != "intro" else seg
+            emb = model.encode(doc).tolist()
+            sal = 0.6
+            if _model_salience:
+                try:
+                    sal = round(predict_salience(emb), 3)
+                except Exception:
+                    sal = 0.6
             batch_ids.append(str(uuid.uuid4()))
             batch_docs.append(doc)
+            batch_embs.append(emb)
             batch_metas.append({
-                "source": src, "salience": 0.6, "timestamp": time.time(),
+                "source": src, "salience": sal, "timestamp": time.time(),
                 "type": "knowledge", "hash": h, "mtime": mtime,
             })
             if len(batch_ids) >= BATCH:

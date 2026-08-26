@@ -144,10 +144,21 @@ def _recency_score(timestamp, memory_type="semantic"):
 
 # ---------- Store ----------
 
+def _salience_for(content, embedding):
+    """Fine-tuned local head first (instant, reuses the stored embedding);
+    LLM judge as fallback when the head is unavailable."""
+    try:
+        from salience_model import predict_salience
+        return round(predict_salience(embedding), 3), "model"
+    except Exception:
+        return _score_salience(content), "llm"
+
+
 def add_memory(content, source="manual", col=None):
     col = col or collection
     embedding = model.encode(content).tolist()
     memory_type = _classify_memory_type(content)
+    salience, salience_src = _salience_for(content, embedding)
 
     existing = col.query(query_embeddings=[embedding], n_results=1)
     if existing["documents"] and existing["documents"][0]:
@@ -158,7 +169,6 @@ def add_memory(content, source="manual", col=None):
 
         if old_similarity >= CONFLICT_SIMILARITY_THRESHOLD:
             if _check_conflict(content, old_content):
-                salience = _score_salience(content)
                 col.update(
                     ids=[old_id],
                     embeddings=[embedding],
@@ -173,7 +183,6 @@ def add_memory(content, source="manual", col=None):
                 print(f"Updated (was: '{old_content[:40]}...') [{memory_type}]: {content[:50]}...")
                 return old_id
 
-    salience = _score_salience(content)
     memory_id = str(uuid.uuid4())
     col.add(
         ids=[memory_id],
@@ -186,7 +195,7 @@ def add_memory(content, source="manual", col=None):
             "type": memory_type,
         }],
     )
-    print(f"Stored (salience {salience:.2f}, type={memory_type}): {content[:50]}...")
+    print(f"Stored (salience {salience:.2f} via {salience_src}, type={memory_type}): {content[:50]}...")
     return memory_id
 
 
