@@ -154,11 +154,24 @@ def _salience_for(content, embedding):
         return _score_salience(content), "llm"
 
 
-def add_memory(content, source="manual", col=None):
+def add_memory(content, source="manual", col=None, emotion=None, emotion_intensity=None):
     col = col or collection
     embedding = model.encode(content).tolist()
     memory_type = _classify_memory_type(content)
     salience, salience_src = _salience_for(content, embedding)
+
+    def _meta():
+        m = {
+            "source": source,
+            "salience": salience,
+            "timestamp": time.time(),
+            "type": memory_type,
+        }
+        if emotion:
+            m["emotion"] = emotion
+        if emotion_intensity is not None:
+            m["emotion_intensity"] = float(emotion_intensity)
+        return m
 
     existing = col.query(query_embeddings=[embedding], n_results=1)
     if existing["documents"] and existing["documents"][0]:
@@ -169,32 +182,12 @@ def add_memory(content, source="manual", col=None):
 
         if old_similarity >= CONFLICT_SIMILARITY_THRESHOLD:
             if _check_conflict(content, old_content):
-                col.update(
-                    ids=[old_id],
-                    embeddings=[embedding],
-                    documents=[content],
-                    metadatas=[{
-                        "source": source,
-                        "salience": salience,
-                        "timestamp": time.time(),
-                        "type": memory_type,
-                    }],
-                )
+                col.update(ids=[old_id], embeddings=[embedding], documents=[content], metadatas=[_meta()])
                 print(f"Updated (was: '{old_content[:40]}...') [{memory_type}]: {content[:50]}...")
                 return old_id
 
     memory_id = str(uuid.uuid4())
-    col.add(
-        ids=[memory_id],
-        embeddings=[embedding],
-        documents=[content],
-        metadatas=[{
-            "source": source,
-            "salience": salience,
-            "timestamp": time.time(),
-            "type": memory_type,
-        }],
-    )
+    col.add(ids=[memory_id], embeddings=[embedding], documents=[content], metadatas=[_meta()])
     print(f"Stored (salience {salience:.2f} via {salience_src}, type={memory_type}): {content[:50]}...")
     return memory_id
 

@@ -10,13 +10,19 @@ LLM answer synthesis → streaming TTS. It runs as a premium web dashboard, a CL
 and an HTTP service — all on the same memory core — and publishes honest eval
 numbers for every claim.
 
+> 🎬 **Demo:** *screen recording of a live voice turn (spoken question → grounded
+> answer in a cloned voice) coming soon — this slot gets the GIF.*
+
 ## Why not just similarity search?
 
 A raw "embed everything, cosine the top-k" memory is a toy. Real recall needs three
 things pure similarity cannot express:
 
-- **Not every memory matters equally.** Every memory gets an LLM-judged **salience**
-  score (0–1) at write time, blended into ranking.
+- **Not every memory matters equally.** Every memory gets an importance
+  (**salience**) score at write time, blended into ranking. The score comes from a
+  small model trained by **distilling an LLM judge** (teacher labels → Ridge on
+  frozen MPNet embeddings), so it's instant and free — with the LLM judge kept as
+  fallback.
 - **Memories go stale at different rates.** Each memory gets a **type** — episodic,
   semantic, procedural, or knowledge — with decay half-lives of **7 / 30 / 90 / 365
   days**. Retrieval applies exponential recency decay accordingly.
@@ -43,6 +49,7 @@ BROWSER MIC ┤
 
 STT: ElevenLabs Scribe (primary, ~2s) → Gemini audio (key-rotating fallback)
 TEXT: OpenRouter / Ox Alpha (primary) → Gemini rotation (fallback)
+TTS: local XTTS-v2 clone server (GPU-accelerated, sentence-streaming) → ElevenLabs fallback
 STORAGE: ChromaDB, local, zero-network
 ```
 
@@ -75,6 +82,9 @@ the pipeline degrades gracefully instead of dying.
 | Cross-language retrieval (EN↔HI) | **67% top-3**, failures analyzed | `bilingual_test.py` |
 | Streaming TTS time-to-first-audio | shown live per turn | dashboard |
 | Confidence gate on never-stored topics | **2/2 refusals** | `eval.py` |
+| TTS synthesis (8s of speech, same text) | **6.9 s on GPU vs 64.7 s on CPU — 9.4×** | `voice_server.py` benchmark |
+| Streaming reply first-audio | **~3.9 s** (sentence-chunked clone stream) | `/voice_stream` |
+| Salience model (Ridge, 5-seed CV, n=838) | **Pearson 0.55 / Spearman 0.55 / MAE 0.23** | `compare_salience.py`, `salience_eval.json` |
 
 **Honest failure analysis:** the multilingual encoder (`paraphrase-multilingual-
 mpnet-base-v2`) has weak true-Hindi coverage; both bilingual misses are Roman-Hindi ↔
@@ -102,14 +112,21 @@ from the vault and answers in English, grounded in the actual text.
 |---|---|
 | `memory.py` | Core: ChromaDB, salience, typing, conflict resolution, hybrid ranking, associative hop |
 | `jigo_voice.py` | Voice pipeline: Scribe-primary STT, intent routing, answer synthesis, streaming TTS (CLI loop) |
-| `web_ui.py` + `static/index.html` | Dashboard: orb UI, confirm-before-store, hands-free VAD, LAB, drawer |
+| `voice_server.py` | Local XTTS-v2 **voice-clone server** (FastAPI): GPU/CPU auto, OOM fallback, warm-up, sentence-streamed PCM |
+| `web_ui.py` + `static/index.html` | Dashboard: orb UI, confirm-before-store, hands-free VAD, LAB, drawer, `/voice_stream` (clone-first, ElevenLabs fallback) |
+| `emotion.py` | Speech emotion analysis (per-turn label + intensity) |
 | `llm.py` | Provider layer: OpenRouter/Ox Alpha primary → Gemini-rotating fallback for every text call |
 | `api.py` | FastAPI service: `/add`, `/search`, `/health` |
 | `obsidian_sync.py` | Read-only Obsidian vault importer (incremental, hash-deduped) |
 | `benchmark.py` | P50/P95 retrieval latency over 20 queries (self-seeding) |
 | `eval.py` | Top-1/top-3 accuracy + adversarial gate tests |
 | `bilingual_test.py` | EN↔HI cross-language retrieval test |
-| `clone_voice.py` | ElevenLabs Instant Voice Cloning setup (paid tier; stock voice used by default) |
+| `export_salience_data.py` | Build the salience candidate pool from imported notes |
+| `judge_distill.py` | LLM teacher: label vault chunks for salience (checkpointed) |
+| `train_salience.py` | Train the MLP salience head on distilled labels |
+| `compare_salience.py` | 5-seed MLP-vs-Ridge model selection (CV) |
+| `finalize_salience.py` | Fit + save the deployed Ridge (`salience_ridge.npz`) |
+| `salience_model.py` | Local salience inference: Ridge → MLP → LLM fallback ladder |
 
 ## Setup
 
@@ -119,6 +136,22 @@ Python 3.10+ (tested on 3.14, Windows).
 pip install sentence-transformers chromadb google-genai elevenlabs sounddevice fastapi uvicorn python-dotenv numpy httpx playwright
 python -m playwright install chromium   # optional: only for UI development
 ```
+
+### Voice-clone server (optional — local TTS in a cloned voice)
+
+A side venv (Python 3.11) keeps the heavy TTS stack isolated from the main env:
+
+```bash
+python -m venv xtts_env
+xtts_env\Scripts\pip install torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cu126   # or .../whl/cpu without an NVIDIA GPU
+xtts_env\Scripts\pip install TTS fastapi uvicorn numpy
+xtts_env\Scripts\python voice_server.py   # -> http://127.0.0.1:8100 (GPU if available, CPU fallback, ~85s warm-up)
+```
+
+Drop a `voice_sample.wav` (~20 seconds) in the project root and replies are spoken
+in that cloned voice — zero-shot, no training data. Without it, a built-in studio
+voice is used. The dashboard streams from this server automatically
+(`/voice_stream`) and falls back to ElevenLabs whenever it's down.
 
 `.env` in the project root:
 
@@ -157,5 +190,8 @@ First run downloads the embedding model (~420 MB). The vector store persists to
 - **Answer synthesis is grounded, not open-ended.** The recall LLM may only use
   retrieved memories and must refuse otherwise — auditable via the UI's
   retrieved-memories list.
-- Voice cloning code ships complete but ElevenLabs IVC requires a paid tier;
-  a stock voice is used until `JIGO_VOICE_ID` exists in `.env`.
+- Replies speak in a **cloned voice** via the local XTTS-v2 server — zero-shot
+  cloning from a ~20s reference sample, no training run, GPU-accelerated with
+  automatic CPU/OOM fallback. ElevenLabs IVC was skipped deliberately: it needs a
+  paid tier and uploads your voice to the cloud; the local server keeps the voice
+  on your machine.

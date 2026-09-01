@@ -606,7 +606,17 @@ async function submitVoice(blob){
   if(DIAG)runLab(blob);
   await submitVoiceCore(blob);
 }
+let voiceBusy=false;
 async function submitVoiceCore(blob){
+  if(voiceBusy){hintEl.textContent="still working on the last turn — one moment…";return;}
+  voiceBusy=true;
+  try{
+    await submitVoiceCoreInner(blob);
+  }finally{
+    voiceBusy=false;
+  }
+}
+async function submitVoiceCoreInner(blob){
   let turnEl=null;
   try{
     const fd=new FormData();
@@ -691,14 +701,18 @@ function renderTurn(d){
   if(d.reply_text)t.dataset.reply="1",t.dataset.replyText=d.reply_text;
   if(d.audio_b64){
     const au=document.createElement("audio");
-    au.className="audio";au.controls=true;au.src="data:audio/mpeg;base64,"+d.audio_b64;
+    au.className="audio";au.controls=true;au.src="data:audio/"+(d.tts_format||"mpeg")+";base64,"+d.audio_b64;
+    activeEls.push(au);
+    au.addEventListener("ended",()=>{const i=activeEls.indexOf(au);if(i>=0)activeEls.splice(i,1);});
     wireReplyReactivity(au);
     t.appendChild(au);
-    au.play().catch(()=>{});
+    // single-owner rule: this element only autoplays if streaming won't take over
+    if(!d.reply_text||!d.reply_text.trim()){au.play().catch(()=>{});}
   }
   const s=d.stats||{};
   const chips=document.createElement("div");chips.className="chips";
   chips.innerHTML="<span class='chip'>transcribe <b>"+s.transcribe_ms+"ms</b></span>"
+    +(d.emotion?"<span class='chip'>you sounded <b>"+esc(d.emotion.label)+"</b> ("+Math.round((d.emotion.intensity||0)*100)+"%)</span>":"")
     +(s.retrieval_ms?"<span class='chip'>retrieved <b>"+s.retrieval_ms+"ms</b></span>":"")
     +(s.answer_ms?"<span class='chip'>answered <b>"+s.answer_ms+"ms</b></span>":"")
     +"<span class='chip'>tts <b>"+s.tts_ms+"ms</b></span>"
@@ -741,7 +755,7 @@ async function speakStreamed(text,turnEl){
   stopAllAudio();
   const t0=performance.now();
   let res;
-  try{res=await fetch("/tts_stream?text="+encodeURIComponent(text));}
+    try{res=await fetch("/voice_stream?text="+encodeURIComponent(text));}
   catch(e){return fallbackSpeak(text,turnEl);}
   if(!res.ok||!res.body)return fallbackSpeak(text,turnEl);
   try{
@@ -905,8 +919,27 @@ async function finishArm(){
 }
 function maybeRearm(){
   if(hfOn&&!armed&&!stream&&overlay.classList.contains("hidden")&&orb.state!=="speaking"){
-    setTimeout(()=>{if(hfOn&&!armed&&!stream)armListen();},450);
+    setTimeout(()=>{if(hfOn&&!armed&&!stream&&activeSrcs.length===0&&activeEls.length===0)armListen();},450);
   }
+}
+
+/* ---------- tab lock: only one dashboard may speak ---------- */
+const tabChan=("BroadcastChannel" in window)?new BroadcastChannel("jigo-tabs"):null;
+let tabBlocked=false;
+if(tabChan){
+  tabChan.onmessage=e=>{
+    const m=e.data||{};
+    if(m.type==="claim"&&!tabBlocked){
+      tabChan.postMessage({type:"already"});
+    }else if(m.type==="already"&&!tabBlocked){
+      tabBlocked=true;
+      if(armed)disarm("another tab owns Jigo");
+      hfOn=false;setHfChip();
+      hintEl.textContent="Jigo is already active in another tab — hands-free disabled here.";
+    }
+  };
+  tabChan.postMessage({type:"claim"});
+  setTimeout(()=>{if(!tabBlocked)tabChan.postMessage({type:"claim"});},300);
 }
 
 /* ---------- text add ---------- */
@@ -944,6 +977,7 @@ function renderRows(filter){
     const sal=Math.round(m.salience*100),dec=Math.round(decayPct(m.timestamp,m.type));
     return "<div class='mem'>"
       +"<div class='mem-top'><span class='badge "+m.type+"'>"+m.type+"</span>"
+      +(m.emotion?"<span class='chip' style='padding:2px 7px'>"+esc(m.emotion)+"</span>":"")
       +"<span class='age'>"+ago(m.timestamp)+" · "+esc(m.source)+"</span>"
       +"<button class='del' data-id='"+m.id+"' title='Delete memory'>✕</button></div>"
       +"<div class='mem-content'>"+esc(m.content)+"</div>"

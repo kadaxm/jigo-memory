@@ -12,11 +12,15 @@ import os
 import re
 import tempfile
 import time
+import wave
+
+import numpy as np
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
+from emotion import analyze_emotion
 from llm import _gemini_clients
 from jigo_voice import (ANSWER_GATE, REFUSAL, VOICE_ID, looks_like_question,
                         _keyword_intent, compose_reply, eleven_client,
@@ -24,6 +28,27 @@ from jigo_voice import (ANSWER_GATE, REFUSAL, VOICE_ID, looks_like_question,
 from memory import TYPE_HALF_LIFE_DAYS, add_memory, collection, search_memory
 
 app = FastAPI(title="Jigo Dashboard")
+
+CLONE_SERVER = "http://127.0.0.1:8100"
+
+
+def _reply_audio(text):
+    """Reply voice: local XTTS clone (your voice, free, private) first;
+    ElevenLabs stock voice as fallback when the clone server is down or slow."""
+    try:
+        import httpx
+        r = httpx.post(f"{CLONE_SERVER}/tts", json={"text": text[:600]}, timeout=30.0)
+        if r.status_code == 200 and r.content:
+            return r.content, "clone", "wav"
+    except Exception as e:
+        print(f"[clone TTS unavailable ({type(e).__name__}) -> ElevenLabs fallback]")
+    audio = eleven_client.text_to_speech.convert(
+        voice_id=VOICE_ID,
+        text=text,
+        model_id="eleven_turbo_v2_5",
+        optimize_streaming_latency=3,
+    )
+    return b"".join(audio), "elevenlabs", "mpeg"
 
 
 class AddRequest(BaseModel):
@@ -63,6 +88,7 @@ def list_memories():
             "type": meta.get("type", "semantic"),
             "timestamp": float(meta.get("timestamp", 0)),
             "source": meta.get("source", "?"),
+            "emotion": meta.get("emotion"),
         })
     items.sort(key=lambda x: x["timestamp"], reverse=True)
     return {"memories": items, "count": len(items)}
@@ -158,6 +184,69 @@ def tts_stream(text: str):
     return StreamingResponse(gen(), media_type="application/octet-stream")
 
 
+@app.get("/voice_stream")
+def voice_stream(text: str):
+    """Reply voice, streaming. Clone server (your voice) first — streamed
+    sentence-by-sentence; ElevenLabs stock voice as automatic fallback when the
+    clone server is down, still loading, or fails before the first byte."""
+    from fastapi.responses import StreamingResponse
+    text = text.strip()[:600]
+    if not text:
+        raise HTTPException(status_code=400, detail="Empty text.")
+
+    import httpx
+
+    upstream = None
+    try:
+        h = httpx.get(f"{CLONE_SERVER}/health", timeout=2.0)
+        if h.status_code == 200 and h.json().get("model_loaded"):
+            upstream = httpx.stream(
+                "POST", f"{CLONE_SERVER}/tts_stream_clone",
+                json={"text": text}, timeout=httpx.Timeout(5.0, read=120.0),
+            )
+            r = upstream.__enter__()
+            if r.status_code == 200:
+                it = r.iter_bytes()  # single iterator — httpx forbids re-streaming
+                first = next(it)     # blocks until first PCM (~2-4s on GPU)
+
+                def gen_clone():
+                    try:
+                        yield first
+                        for chunk in it:
+                            yield chunk
+                    except Exception as e:
+                        print(f"[clone stream aborted mid-way: {e}]")
+                    finally:
+                        try:
+                            upstream.__exit__(None, None, None)
+                        except Exception:
+                            pass
+
+                return StreamingResponse(gen_clone(), media_type="application/octet-stream")
+            upstream.__exit__(None, None, None)
+            upstream = None
+            print("[clone stream bad status -> ElevenLabs fallback]")
+    except Exception as e:
+        print(f"[clone stream unavailable ({type(e).__name__}) -> ElevenLabs fallback]")
+        if upstream:
+            try:
+                upstream.__exit__(None, None, None)
+            except Exception:
+                pass
+        upstream = None
+
+    def gen_fallback():
+        yield from eleven_client.text_to_speech.stream(
+            voice_id=VOICE_ID,
+            text=text,
+            model_id="eleven_turbo_v2_5",
+            output_format="pcm_24000",
+            optimize_streaming_latency=3,
+        )
+
+    return StreamingResponse(gen_fallback(), media_type="application/octet-stream")
+
+
 @app.post("/voice")
 async def voice(audio: UploadFile = File(...), confirm_store: str = Form("0"), skip_tts: str = Form("0")):
     """Full spoken turn: browser mic audio in -> transcript, routing, memory ops, TTS audio out.
@@ -189,6 +278,17 @@ async def voice(audio: UploadFile = File(...), confirm_store: str = Form("0"), s
             print(f"[intent guard: '{transcript[:50]}' looks like a question -> recall]")
             intent = "recall"
 
+        # speech emotion from the captured audio
+        emo = None
+        try:
+            with wave.open(tmp_path, "rb") as wf:
+                frames = wf.readframes(wf.getnframes())
+                rate = wf.getframerate()
+            pcm = np.frombuffer(frames, dtype=np.int16)
+            emo = analyze_emotion(pcm, rate)
+        except Exception:
+            pass
+
         if intent == "store" and transcript and confirm_store in ("1", "true", "True"):
             return {
                 "intent": "store",
@@ -207,7 +307,9 @@ async def voice(audio: UploadFile = File(...), confirm_store: str = Form("0"), s
 
         if intent == "store" and transcript:
             t1 = time.perf_counter()
-            stored_id = add_memory(transcript, source="voice")
+            stored_id = add_memory(transcript, source="voice",
+                                   emotion=(emo or {}).get("label"),
+                                   emotion_intensity=(emo or {}).get("intensity"))
             retrieval_ms = round((time.perf_counter() - t1) * 1000)
             reply_text = "Got it, I'll remember that."
         elif intent == "recall" and transcript:
@@ -236,17 +338,13 @@ async def voice(audio: UploadFile = File(...), confirm_store: str = Form("0"), s
         else:
             reply_text = "I couldn't tell if that was something to remember or a question."
 
-        mp3 = b""
+        audio_bytes = b""
         tts_ms = 0
+        voice_source = None
+        tts_format = "mpeg"
         if skip_tts not in ("1", "true", "True"):
             t2 = time.perf_counter()
-            audio_gen = eleven_client.text_to_speech.convert(
-                voice_id=VOICE_ID,
-                text=reply_text,
-                model_id="eleven_turbo_v2_5",
-                optimize_streaming_latency=3,
-            )
-            mp3 = b"".join(audio_gen)
+            audio_bytes, voice_source, tts_format = _reply_audio(reply_text)
             tts_ms = (time.perf_counter() - t2) * 1000
 
         return {
@@ -257,15 +355,17 @@ async def voice(audio: UploadFile = File(...), confirm_store: str = Form("0"), s
             "gate_score": gate_score,
             "stored_id": stored_id,
             "recalled": recalled,
+            "emotion": emo,
+            "voice_source": voice_source,
             "stats": {
                 "transcribe_ms": round(transcribe_ms),
                 "retrieval_ms": retrieval_ms,
                 "answer_ms": answer_ms,
                 "tts_ms": round(tts_ms),
-                "tts_bytes": len(mp3),
+                "tts_bytes": len(audio_bytes),
                 "total_ms": round((time.perf_counter() - t0) * 1000),
             },
-            "audio_b64": base64.b64encode(mp3).decode("ascii"),
+            "audio_b64": base64.b64encode(audio_bytes).decode("ascii"),
         }
     except HTTPException:
         raise

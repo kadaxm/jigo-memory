@@ -1,6 +1,17 @@
 {
-  "test_pearson": 0.4145971806664263,
-  "test_spearman": 0.47667984189723317,
-  "test_mae": 0.2408047318458557,
-  "n": 439
+  "model": "ridge",
+  "selected_by": "5-seed CV (compare_salience.py): Ridge beat MLP head on Pearson, Spearman and MAE with lower variance",
+  "cv_pearson_mean": 0.55,
+  "cv_pearson_std": 0.034,
+  "cv_spearman_mean": 0.553,
+  "cv_spearman_std": 0.047,
+  "cv_mae_mean": 0.225,
+  "cv_mae_std": 0.007,
+  "seeds": [42, 7, 123, 2024, 99],
+  "n": 838,
+  "deployment": "salience_ridge.npz, output clamped to [0,1]; fallback ladder: Ridge -> MLP head -> LLM judge",
+  "history": {
+    "v1_mlp_n439": {"test_pearson": 0.4146, "test_spearman": 0.4767, "test_mae": 0.2408},
+    "v2_mlp_n838_seed42": {"test_pearson": 0.434, "test_spearman": 0.416, "test_mae": 0.252}
+  }
 }

@@ -1,7 +1,7 @@
-"""Local salience inference: frozen encoder embedding -> trained head (~instant).
+"""Local salience inference: frozen encoder embedding -> trained model (~instant).
 
-Replaces the LLM salience call on the store path. Falls back gracefully if the
-trained head is missing (add_memory then uses the LLM judge).
+Replaces the LLM salience call on the store path. Falls back gracefully:
+Ridge (preferred, 5-seed CV winner) -> MLP head -> raise (caller uses LLM judge).
 """
 
 import os
@@ -12,6 +12,8 @@ import torch.nn as nn
 
 PROJECT = os.path.dirname(os.path.abspath(__file__))
 HEAD_PATH = os.path.join(PROJECT, "salience_head.pt")
+RIDGE_PATH = os.path.join(PROJECT, "salience_ridge.npz")
+_ridge = None
 _head = None
 _loaded = False
 
@@ -30,12 +32,19 @@ class Head(nn.Module):
 
 
 def _load():
-    global _head, _loaded
+    global _ridge, _head, _loaded
     if _loaded:
-        return _head
+        return
     _loaded = True
+    if os.path.exists(RIDGE_PATH):
+        try:
+            d = np.load(RIDGE_PATH)
+            _ridge = (d["W"].astype(np.float64), float(d["b"]))
+            return
+        except Exception as e:
+            print(f"[salience ridge load failed: {e}]")
     if not os.path.exists(HEAD_PATH):
-        return None
+        return
     try:
         ckpt = torch.load(HEAD_PATH, map_location="cpu", weights_only=True)
         _head = Head()
@@ -44,14 +53,16 @@ def _load():
     except Exception as e:
         print(f"[salience head load failed: {e}]")
         _head = None
-    return _head
 
 
 def predict_salience(embedding):
     """embedding: 768-dim list/array (the SAME vector stored in ChromaDB — zero extra encode cost)."""
-    head = _load()
-    if head is None:
-        raise RuntimeError("salience head not available")
+    _load()
+    x = np.asarray(embedding, dtype=np.float64)
+    if _ridge is not None:
+        W, b = _ridge
+        return float(np.clip(W @ x + b, 0.0, 1.0))
+    if _head is None:
+        raise RuntimeError("salience model not available")
     with torch.no_grad():
-        x = torch.tensor(np.array([embedding], dtype=np.float32))
-        return float(head(x).item())
+        return float(_head(torch.tensor(np.array([x], dtype=np.float32))).item())

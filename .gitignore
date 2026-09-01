@@ -7,6 +7,23 @@ chroma_memory/
 # audio artifacts (incl. personal voice samples)
 *.wav
 
+# training data built from personal vault notes — never public
+salience_dataset.json
+
+# runtime logs
+*.log
+*.err
+
+# local backups
+*_backup.pt
+*_backup.json
+
+# side venv (heavy, machine-specific)
+xtts_env/
+
+# interview prep — private, never commit
+TRAINING_NOTES.md
+
 # python cruft
 __pycache__/
 .venv/
