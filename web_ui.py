@@ -264,8 +264,17 @@ async def voice(audio: UploadFile = File(...), confirm_store: str = Form("0"), s
             f.write(raw)
 
         t0 = time.perf_counter()
+        # capture input duration — separates "long recording" from "slow API"
+        # when transcribe_ms spikes (28s mystery diagnosis)
+        try:
+            with wave.open(tmp_path, "rb") as wf:
+                audio_s = wf.getnframes() / float(wf.getframerate() or 16000)
+        except Exception:
+            audio_s = -1
+        print(f"[stt input: {audio_s:.1f}s audio]")
         result = transcribe_and_classify_with_fallback(tmp_path)
         transcribe_ms = (time.perf_counter() - t0) * 1000
+        print(f"[stt: {transcribe_ms}ms for {audio_s:.1f}s audio]")
 
         intent = result.get("intent")
         transcript = (result.get("text") or "").strip()
@@ -359,6 +368,7 @@ async def voice(audio: UploadFile = File(...), confirm_store: str = Form("0"), s
             "voice_source": voice_source,
             "stats": {
                 "transcribe_ms": round(transcribe_ms),
+                "audio_s": round(audio_s, 1),
                 "retrieval_ms": retrieval_ms,
                 "answer_ms": answer_ms,
                 "tts_ms": round(tts_ms),

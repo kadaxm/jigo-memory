@@ -75,18 +75,23 @@ def analyze_emotion(pcm_int16, rate=16000):
         "speech_rate": round(rate_proxy, 2),
     }
 
-    # normalized drivers (calibrated for typical laptop-mic speech)
-    loud = min(1.0, energy / 0.12)
-    pitchy = min(1.0, (f0_std or 0.0) / 55.0)
-    high = min(1.0, ((f0 or 0.0) - 120.0) / 140.0) if f0 else 0.0
-    fast = min(1.0, max(0.0, (rate_proxy - 2.2) / 2.6))
-    quiet = min(1.0, max(0.0, (0.05 - energy) / 0.04))
+    # normalized drivers — recalibrated after live misfires ("stressed 79%" on a
+    # calm speaker). Key changes vs v1: pitch variability must be CLEARLY elevated
+    # (baseline 25 Hz subtracted), dynamics no longer max the stress driver on
+    # their own (clear close-mic speech is not stress), and every non-neutral
+    # score carries a -0.10 offset so neutral wins unless emotion is obvious.
+    loud = min(1.0, energy / 0.15)
+    pitchy = min(1.0, max(0.0, ((f0_std or 0.0) - 25.0) / 55.0))
+    high = min(1.0, max(0.0, ((f0 or 0.0) - 150.0) / 130.0)) if f0 else 0.0
+    fast = min(1.0, max(0.0, (rate_proxy - 2.5) / 3.0))
+    quiet = min(1.0, max(0.0, (0.045 - energy) / 0.035))
+    punchy = min(1.0, max(0.0, (dyn - 0.05) / 0.10))
 
-    excitement = 0.45 * pitchy + 0.30 * fast + 0.25 * loud
-    stress = 0.55 * pitchy + 0.25 * high + 0.20 * min(1.0, dyn / 0.08) - 0.15 * loud
-    softness = quiet * (1.0 - 0.5 * pitchy)
+    excitement = max(0.0, 0.45 * pitchy + 0.30 * fast + 0.25 * loud - 0.10)
+    stress = max(0.0, 0.50 * pitchy + 0.25 * high + 0.15 * punchy - 0.20 * loud - 0.10)
+    softness = max(0.0, quiet * (1.0 - 0.5 * pitchy))
 
-    scores = {"excited": excitement, "stressed": max(0.0, stress), "soft": softness, "neutral": 0.35}
+    scores = {"excited": excitement, "stressed": stress, "soft": softness, "neutral": 0.45}
     label = max(scores, key=scores.get)
     intensity = round(min(1.0, max(0.15, scores[label])), 2)
 

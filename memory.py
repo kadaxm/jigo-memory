@@ -15,6 +15,7 @@ load_dotenv()
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chroma_memory")
 COLLECTION_NAME = "memories"
 CONFLICT_SIMILARITY_THRESHOLD = 0.75
+TEMPORAL_UPDATE_SIMILARITY = 0.55   # explicit update phrasing lowers the overwrite bar
 SIMILARITY_WEIGHT = 0.6
 SALIENCE_WEIGHT = 0.25
 RECENCY_WEIGHT = 0.15
@@ -26,6 +27,40 @@ TYPE_HALF_LIFE_DAYS = {
     "procedural": 90,   # how-to knowledge barely decays
     "knowledge": 365,   # imported second-brain notes (Obsidian) — reference knowledge
 }
+
+# --- temporal updates & canonicalization ---
+
+# "moved to Wednesday", "rescheduled", "no longer", "actually ..." etc. — the user
+# is CORRECTING an existing memory, so a much weaker embedding match should
+# trigger the overwrite path instead of creating a duplicate row.
+_UPDATE_PATTERNS = re.compile(
+    r"\b(actually|instead|now it'?s|changed to|moved to|got moved|rescheduled|"
+    r"postponed|no longer|switched to|updated to|canceled|cancelled|shifted to)\b",
+    re.I,
+)
+
+# Leading conversational filler — stripped so memories store clean facts
+# ("Actually, I have told you before that my movie night..." -> "my movie night ...").
+_FILLER_RES = [
+    re.compile(r"^(?:i (?:have )?told you (?:that )?before that)\b[,.!]?\s*", re.I),
+    re.compile(r"^(?:i (?:just )?wanted to tell you(?: that)?)\b[,.!]?\s*", re.I),
+    re.compile(r"^please (?:note|remember)(?: that)?\b[,.!]?\s*", re.I),
+    re.compile(r"^(?:just so you know|by the way|btw|fyi)\b[,.!]?\s*", re.I),
+    re.compile(r"^(?:actually|ok(?:ay)?|so|and|but|also)\b[,.!]?\s*", re.I),
+]
+
+
+def _canonicalize(text):
+    """Strip leading conversational filler so memories store clean facts."""
+    t = " ".join((text or "").split())
+    for _ in range(5):
+        stripped = t
+        for rx in _FILLER_RES:
+            stripped = rx.sub("", stripped, count=1).strip()
+        if stripped == t:
+            break
+        t = stripped
+    return t
 # -------------------------------------------
 
 print("Loading embedding model... (first run may take a minute)")
@@ -156,9 +191,16 @@ def _salience_for(content, embedding):
 
 def add_memory(content, source="manual", col=None, emotion=None, emotion_intensity=None):
     col = col or collection
+    content = _canonicalize(content) or content
     embedding = model.encode(content).tolist()
     memory_type = _classify_memory_type(content)
     salience, salience_src = _salience_for(content, embedding)
+
+    # temporal-update phrasing ("moved to...", "actually...") means the user is
+    # correcting something they already said — accept a much weaker embedding
+    # match as "the memory being updated" and overwrite without the LLM judge.
+    temporal_update = bool(_UPDATE_PATTERNS.search(content))
+    sim_threshold = TEMPORAL_UPDATE_SIMILARITY if temporal_update else CONFLICT_SIMILARITY_THRESHOLD
 
     def _meta():
         m = {
@@ -180,10 +222,10 @@ def add_memory(content, source="manual", col=None, emotion=None, emotion_intensi
         old_distance = existing["distances"][0][0]
         old_similarity = 1 / (1 + old_distance)
 
-        if old_similarity >= CONFLICT_SIMILARITY_THRESHOLD:
-            if _check_conflict(content, old_content):
+        if old_similarity >= sim_threshold:
+            if temporal_update or _check_conflict(content, old_content):
                 col.update(ids=[old_id], embeddings=[embedding], documents=[content], metadatas=[_meta()])
-                print(f"Updated (was: '{old_content[:40]}...') [{memory_type}]: {content[:50]}...")
+                print(f"Updated ({'temporal update' if temporal_update else 'conflict'}, was: '{old_content[:40]}...') [{memory_type}]: {content[:50]}...")
                 return old_id
 
     memory_id = str(uuid.uuid4())
@@ -236,6 +278,7 @@ def search_memory(query, top_k=3, associative=True, col=None):
             "recency": recency,
             "type": meta.get("type", "semantic"),
             "source": meta.get("source"),
+            "timestamp": meta.get("timestamp", 0),
             "is_associative": False,
         }
 

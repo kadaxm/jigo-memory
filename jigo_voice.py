@@ -159,10 +159,18 @@ def _strip_md(s):
     return " ".join(s.split())
 
 
+def _age_tag(ts):
+    """Human-readable freshness marker for a memory timestamp."""
+    if not ts:
+        return ""
+    d = int((time.time() - ts) // 86400)
+    return "[today] " if d <= 0 else f"[{d}d ago] "
+
+
 def compose_reply(query, results):
     """LLM-generated conversational answer grounded ONLY in retrieved memories.
     Meta-questions about Jigo itself get a brief in-persona answer."""
-    mem_lines = "\n".join(f"- {_strip_md(r['content'])[:300]}" for r in results[:8])
+    mem_lines = "\n".join(f"- {_age_tag(r.get('timestamp'))}{_strip_md(r['content'])[:300]}" for r in results[:8])
     prompt = (
         "You are Jigo, a warm voice assistant with a memory. The user asks:\n"
         f"\"{query}\"\n\n"
@@ -173,35 +181,45 @@ def compose_reply(query, results):
         "2. For questions about the user's life, use ONLY the memories above. Never invent. "
         "If they do not contain the answer, respond with exactly: " + REFUSAL + "\n"
         "3. Answer in at most 2 short spoken-style sentences.\n"
-        "4. NEVER quote or echo memory titles, headings, or markdown. Speak plain prose.\n\n"
+        "4. NEVER quote or echo memory titles, headings, or markdown. Speak plain prose.\n"
+        "5. If two memories contradict each other (e.g. one says an event is on Tuesday, "
+        "another says it moved to Wednesday), the MORE RECENT one is true — state only "
+        "the current fact and silently ignore the outdated one.\n\n"
         "Example — memories: ['- THE REAL QUESTION ISNT WHO AM I: some essay'], "
         "question: \"do you remember me?\" "
         "Good answer: \"Of course I remember you — good to hear from you again!\" "
         "Bad answer (never do this): \"THE REAL QUESTION ISNT WHO AM I: some essay\""
     )
+    out = ""
     try:
-        raw = llm.chat(
-            prompt,
-            system="Answer directly in at most two short sentences. No preamble, no reasoning out loud. "
-                   "Never quote memory titles or markdown — speak plain prose.",
-            max_tokens=1500,
-            temperature=0.4,
-            timeout=14,
-        )
+        # fast model primary: recall answers are 1-2 sentences — a 17s tail on the
+        # premium provider is wasted latency when the lite model answers in ~2s
+        raw = llm.fast_gemini_chat(prompt, max_tokens=220, temperature=0.35)
         out = _strip_md(" ".join(raw.split())).strip()
-        # title-echo detector: if the model parroted a note heading, retry on fast Gemini
-        if (not out) or ("##" in raw) or (out.upper() == out and len(out) > 25):
-            print("[compose_reply: title-echo detected -> fast gemini retry]")
-            out = _strip_md(" ".join(llm.fast_gemini_chat(prompt, 600, 0.4).split())).strip()
-        if out:
-            # dedupe "TITLE: TITLE" pattern from cleaned echoes
-            if ": " in out:
-                head, rest = out.split(": ", 1)
-                if head.strip().lower() == rest.strip().lower():
-                    out = rest.strip()
-            return out
     except Exception as e:
-        print(f"[compose_reply failed ({str(e)[:80]})]")
+        print(f"[compose_reply fast path failed ({str(e)[:80]})]")
+    # title-echo / empty detector: retry on the premium provider
+    if (not out) or out.upper() == out and len(out) > 25:
+        print("[compose_reply: retry on premium provider]")
+        try:
+            raw = llm.chat(
+                prompt,
+                system="Answer directly in at most two short sentences. No preamble, no reasoning out loud. "
+                       "Never quote memory titles or markdown — speak plain prose.",
+                max_tokens=220,
+                temperature=0.4,
+                timeout=14,
+            )
+            out = _strip_md(" ".join(raw.split())).strip() or out
+        except Exception as e:
+            print(f"[compose_reply retry failed ({str(e)[:80]})]")
+    if out:
+        # dedupe "TITLE: TITLE" pattern from cleaned echoes
+        if ": " in out:
+            head, rest = out.split(": ", 1)
+            if head.strip().lower() == rest.strip().lower():
+                out = rest.strip()
+        return out
     # graceful degradation: cleaned echo of the best memory (never raw markdown)
     top = _strip_md(results[0]["content"])[:220]
     print("[compose_reply empty -> cleaned echo]")
