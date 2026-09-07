@@ -264,9 +264,16 @@ def search_memory(query, top_k=3, associative=True, col=None):
         raw_similarity = 1 / (1 + dist)
         salience = meta.get("salience", 0.5)
         recency = _recency_score(meta.get("timestamp", time.time()), meta.get("type", "semantic"))
+        # Salience ranking band: the distilled head's ordering is imperfect
+        # (Spearman ~0.55 vs the LLM teacher), so its full 0-1 spread let
+        # high-salience memories dominate unrelated queries (eval top-1 fell
+        # to 38%). Bounding its contribution to a ±0.05 tie-breaker band
+        # restores similarity-first ranking while salience still orders
+        # near-ties. Stored salience (ledger display) stays unbounded.
+        salience_band = 0.4 + 0.2 * min(1.0, max(0.0, salience))
         final_score = (
             SIMILARITY_WEIGHT * raw_similarity
-            + SALIENCE_WEIGHT * salience
+            + SALIENCE_WEIGHT * salience_band
             + RECENCY_WEIGHT * recency
         )
         return {

@@ -36,8 +36,9 @@ things pure similarity cannot express:
   *replace*, not duplicate. A conflict check against the nearest existing memory
   overwrites the old row in place.
 
-Retrieval ranks with `0.6·similarity + 0.25·salience + 0.15·recency`, then adds a
-bounded **associative hop**: the best match's own neighbors join at half weight.
+Retrieval ranks with `0.6·similarity + 0.25·salience + 0.15·recency` (salience
+contribution bounded to a tie-breaker band — see the eval-caught bugs below), then
+adds a bounded **associative hop**: the best match's own neighbors join at half weight.
 
 **Deliberate deviation:** memory-type classification uses keyword rules rather than
 an LLM call — free, instant, deterministic. The LLM budget goes where it matters:
@@ -46,7 +47,7 @@ answering.
 ## Architecture
 
 ```
-            ┌── STORE: embed → salience (LLM) → type (rules) → conflict check → ChromaDB
+            ┌── STORE: embed → salience (Ridge model) → type (rules) → conflict check → ChromaDB
 BROWSER MIC ┤
             └── RECALL: embed → hybrid rank → associative hop (0.5×)
                         → answer gate (raw ≥ 0.45)
@@ -82,12 +83,12 @@ the pipeline degrades gracefully instead of dying.
 
 | Metric | Result | Source |
 |---|---|---|
-| Retrieval accuracy (16 fixed pairs) | **100% top-1 / top-3** | `eval.py` |
-| Retrieval latency | **P50 76 ms / P95 86 ms** | `benchmark.py` |
-| STT latency (Scribe, 5s clip) | **~2.1 s** | LAB comparison |
-| Cross-language retrieval (EN↔HI) | **67% top-3**, failures analyzed | `bilingual_test.py` |
+| Retrieval accuracy (16 fixed pairs) | **100% top-1 / top-3** | `eval.py` — re-certified 31 Aug 2026 |
+| Retrieval latency | **P50 67 ms / P95 72 ms** | `benchmark.py` — re-certified 31 Aug 2026 |
+| STT latency (Scribe, 5s clip) | **~2.1 s** typical | LAB comparison |
+| Cross-language retrieval (EN↔HI) | **67% top-3**, failures analyzed | `bilingual_test.py` — re-certified 31 Aug 2026 |
 | Streaming TTS time-to-first-audio | shown live per turn | dashboard |
-| Confidence gate on never-stored topics | **2/2 refusals** | `eval.py` |
+| Confidence gate on never-stored topics | **2/2 refusals** | `eval.py` — re-certified 31 Aug 2026 |
 | TTS synthesis (8s of speech, same text) | **6.9 s on GPU vs 64.7 s on CPU — 9.4×** | `voice_server.py` benchmark |
 | Streaming reply first-audio | **~3.9 s** (sentence-chunked clone stream) | `/voice_stream` |
 | Salience model (Ridge, 5-seed CV, n=838) | **Pearson 0.55 / Spearman 0.55 / MAE 0.23** | `compare_salience.py`, `salience_eval.json` |
@@ -97,10 +98,21 @@ mpnet-base-v2`) has weak true-Hindi coverage; both bilingual misses are Roman-Hi
 English semantic gaps ("uthta hoon" ↔ "rise"). LaBSE is the known upgrade path,
 deliberately deferred.
 
-**A bug the eval caught:** the original confidence gate compared the *hybrid* score —
+**Two bugs the eval suite caught:**
+
+1. *The confidence-gate floor.* The original gate compared the **blended** score —
 but salience+recency put a ~0.28 floor under every score, so questions about things
 never stored ("What is my cat's name?") scored 0.61+ and got confident wrong answers.
-The gate now uses raw embedding similarity. This is why eval sets need adversarial cases.
+The gate now uses raw embedding similarity.
+
+2. *The distilled head hijacked ranking.* Deploying the trained salience model
+silently regressed retrieval from 100% to 38% top-1: the Ridge assigns extreme
+salience (0.00–1.00) to plain facts, and at 0.25 weight in the hybrid formula its
+ordering errors overpowered similarity itself — "I wake up at five thirty" started
+winning queries about ChromaDB. Fix: salience's ranking contribution is bounded to
+a small tie-breaker band at query time (stored/displayed salience stays raw), and
+the eval suite re-certified 100% / 2-2. Lesson: a distilled model can be right on
+average (Spearman 0.55) and still wrong in ways only an end-to-end eval exposes.
 
 ## Obsidian integration — your second brain, speaking
 
@@ -118,7 +130,7 @@ from the vault and answers in English, grounded in the actual text.
 |---|---|
 | `memory.py` | Core: ChromaDB, salience, typing, conflict resolution, hybrid ranking, associative hop |
 | `jigo_voice.py` | Voice pipeline: Scribe-primary STT, intent routing, answer synthesis, streaming TTS (CLI loop) |
-| `voice_server.py` | Local XTTS-v2 **voice-clone server** (FastAPI): GPU/CPU auto, OOM fallback, warm-up, sentence-streamed PCM |
+| `voice_server.py` | Local XTTS-v2 **voice-clone server** (FastAPI): GPU/CPU auto, OOM fallback, lazy-load + idle auto-unload, sentence-streamed PCM |
 | `web_ui.py` + `static/index.html` | Dashboard: orb UI, confirm-before-store, hands-free VAD, LAB, drawer, `/voice_stream` (clone-first, ElevenLabs fallback) |
 | `emotion.py` | Speech emotion analysis (per-turn label + intensity) |
 | `llm.py` | Provider layer: OpenRouter/Ox Alpha primary → Gemini-rotating fallback for every text call |
@@ -151,8 +163,13 @@ A side venv (Python 3.11) keeps the heavy TTS stack isolated from the main env:
 python -m venv xtts_env
 xtts_env\Scripts\pip install torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cu126   # or .../whl/cpu without an NVIDIA GPU
 xtts_env\Scripts\pip install TTS fastapi uvicorn numpy
-xtts_env\Scripts\python voice_server.py   # -> http://127.0.0.1:8100 (GPU if available, CPU fallback, ~85s warm-up)
+xtts_env\Scripts\python voice_server.py   # -> http://127.0.0.1:8100 (GPU if available, CPU fallback)
 ```
+
+The model loads **lazily on first use** (~85s) and **auto-unloads after 600s idle**
+(configurable via `JIGO_UNLOAD_SECONDS`) — an idle server sits at a ~300MB
+skeleton instead of ~2.5GB resident. Set `JIGO_WARMUP=1` to pre-load at startup
+instead.
 
 Drop a `voice_sample.wav` (~20 seconds) in the project root and replies are spoken
 in that cloned voice — zero-shot, no training data. Without it, a built-in studio
