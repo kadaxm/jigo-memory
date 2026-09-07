@@ -10,8 +10,14 @@ LLM answer synthesis → streaming TTS. It runs as a premium web dashboard, a CL
 and an HTTP service — all on the same memory core — and publishes honest eval
 numbers for every claim.
 
-> 🎬 **Demo:** *screen recording of a live voice turn (spoken question → grounded
-> answer in a cloned voice) coming soon — this slot gets the GIF.*
+![Jigo live demo — a spoken question answered from memory in a cloned voice](assets/demo.gif)
+
+> 🎬 **Demo:** a real voice turn — *"when is my movie night?"* — answered from
+> memory in a cloned voice, with per-turn telemetry on screen. Just before this
+> moment, the user said *"it moved to Wednesday"* — the stale fact was replaced,
+> not duplicated, and the answer reflects only the current truth. The full
+> walkthrough stores, recalls, updates conflicts, and **refuses** a question
+> about something it was never told.
 
 ## Why not just similarity search?
 
