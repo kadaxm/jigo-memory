@@ -22,6 +22,7 @@ from pydantic import BaseModel
 
 from emotion import analyze_emotion
 from llm import _gemini_clients
+from persona import compose_persona_reply, compose_roast_reply, pick_mode
 from jigo_voice import (ANSWER_GATE, REFUSAL, VOICE_ID, looks_like_question,
                         _keyword_intent, compose_reply, eleven_client,
                         transcribe_and_classify_with_fallback)
@@ -297,6 +298,15 @@ async def voice(audio: UploadFile = File(...), confirm_store: str = Form("0"), s
             emo = analyze_emotion(pcm, rate)
         except Exception:
             pass
+        emo_label = (emo or {}).get("label")
+
+        # persona / roast mode: user-mood triggers a styled reply instead of
+        # the neutral grounded answer (uncle calms sadness, roast teases joy)
+        reply_mode = pick_mode(emo_label)
+        if intent == "recall" and reply_mode == "persona":
+            print(f"[persona mode: '{transcript[:50]}' + mood {emo_label} -> masala uncle reply]")
+        elif intent == "recall" and reply_mode == "roast":
+            print(f"[roast mode: '{transcript[:50]}' + mood {emo_label} -> demotivator reply]")
 
         if intent == "store" and transcript and confirm_store in ("1", "true", "True"):
             return {
@@ -333,7 +343,12 @@ async def voice(audio: UploadFile = File(...), confirm_store: str = Form("0"), s
                     for r in results
                 ]
                 t_answer = time.perf_counter()
-                answer = compose_reply(transcript, results)
+                if reply_mode == "persona":
+                    reply_text = compose_persona_reply(transcript, results, emo_label)
+                elif reply_mode == "roast":
+                    reply_text = compose_roast_reply(transcript, results, emo_label)
+                else:
+                    reply_text = compose_reply(transcript, results)
                 answer_ms = round((time.perf_counter() - t_answer) * 1000)
                 if answer:
                     reply_text = answer
@@ -365,6 +380,7 @@ async def voice(audio: UploadFile = File(...), confirm_store: str = Form("0"), s
             "stored_id": stored_id,
             "recalled": recalled,
             "emotion": emo,
+            "reply_mode": reply_mode,
             "voice_source": voice_source,
             "stats": {
                 "transcribe_ms": round(transcribe_ms),
