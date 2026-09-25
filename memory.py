@@ -6,12 +6,19 @@ import math
 import time
 import re
 import os
+import sys
 
 import llm
 from dotenv import load_dotenv
 
 # --- CONFIG ---
 load_dotenv()
+if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chroma_memory")
 COLLECTION_NAME = "memories"
 CONFLICT_SIMILARITY_THRESHOLD = 0.75

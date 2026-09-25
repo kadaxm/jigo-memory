@@ -22,15 +22,57 @@ from pydantic import BaseModel
 
 from emotion import analyze_emotion
 from llm import _gemini_clients
-from persona import compose_persona_reply, compose_roast_reply, pick_mode
+from persona import (compose_persona_reply, compose_roast_reply, pick_mode,
+                     PERSONA_ACTIVE)
 from jigo_voice import (ANSWER_GATE, REFUSAL, VOICE_ID, looks_like_question,
                         _keyword_intent, compose_reply, eleven_client,
                         transcribe_and_classify_with_fallback)
 from memory import TYPE_HALF_LIFE_DAYS, add_memory, collection, search_memory
 
+# --- persona content trigger: sadness vocabulary (user says something sad —
+# the uncle responds even when the voice tone itself was calm) ---
+_SAD_CONTENT = ("maan kharab", "man kharab", "dukh", "udas", "dukhi", "r roy chhu",
+                "rou chhu", "low feel", "feeling low", "feeling down", "sad",
+                "depressed", "ghabrai", "ghabhray", "dar lag", "anxious", "tension",
+                "nusasan", "haani", "nukshan", "loss", "fail", "kharab chhe",
+                "kharab chhu", "saras nathi", "barbaad",
+                # Gujarati native script (Scribe sometimes returns it correctly)
+                "મન ખરાબ", "ખરાબ છે", "સરસ નથી", "ઉદાસ", "દુઃખ", "થાકી ગયો",
+                "નથી લાગતું")
+
 app = FastAPI(title="Jigo Dashboard")
 
 CLONE_SERVER = "http://127.0.0.1:8100"
+
+_GREET_TOKENS = ("hello", "hi", "hey", "namaste", "namaskar", "kem che", "kem cho",
+                 "kem chho", "good morning", "good afternoon", "good evening", "jigo")
+_GREET_TAILS = ("how are you", "how r u", "kem cho", "su chale", "kya chal raha",
+                "kya haal", "what's up", "whats up")
+
+
+def _is_greeting(text):
+    """Bare greetings and greeting+small-talk ('hello', 'how are you', 'hey bhai
+    kem cho') must never be stored as memories."""
+    t = " ".join((text or "").lower().split())
+    t = re.sub(r"[^\w\s']", "", t).strip()
+    if not t:
+        return False
+    prev = None
+    while prev != t:
+        prev = t
+        if t in _GREET_TOKENS or t in _GREET_TAILS:
+            return True
+        for g in _GREET_TOKENS:
+            if t.startswith(g + " "):
+                t = t[len(g) + 1:].strip()
+    return t in _GREET_TAILS
+
+
+def _sad_content(text):
+    """Content-level sadness signal: user *says* something sad even in a calm
+    voice ('aaj maan kharab chhe bhai...'). Complements emotion.py's tone signal."""
+    t = " ".join((text or "").lower().split())
+    return any(k in t for k in _SAD_CONTENT)
 
 
 def _reply_audio(text):
@@ -288,6 +330,12 @@ async def voice(audio: UploadFile = File(...), confirm_store: str = Form("0"), s
             print(f"[intent guard: '{transcript[:50]}' looks like a question -> recall]")
             intent = "recall"
 
+        # greeting/small-talk guard: greetings get a friendly reply, never stored
+        # (the keyword classifier defaults to store, which swallowed greetings)
+        if _is_greeting(transcript):
+            print(f"[intent guard: greeting '{transcript[:40]}' -> friendly reply, not stored]")
+            intent = "greeting"
+
         # speech emotion from the captured audio
         emo = None
         try:
@@ -302,11 +350,13 @@ async def voice(audio: UploadFile = File(...), confirm_store: str = Form("0"), s
 
         # persona / roast mode: user-mood triggers a styled reply instead of
         # the neutral grounded answer (uncle calms sadness, roast teases joy)
+        # trigger = detected TONE (emotion.py) OR sad CONTENT (user *says* something
+        # sad in a calm voice: "aaj maan kharab chhe bhai...")
+        content_sad = _sad_content(transcript)
         reply_mode = pick_mode(emo_label)
-        if intent == "recall" and reply_mode == "persona":
-            print(f"[persona mode: '{transcript[:50]}' + mood {emo_label} -> masala uncle reply]")
-        elif intent == "recall" and reply_mode == "roast":
-            print(f"[roast mode: '{transcript[:50]}' + mood {emo_label} -> demotivator reply]")
+        if not reply_mode and content_sad and PERSONA_ACTIVE():
+            reply_mode = "persona"
+            print(f"[persona mode: sad CONTENT detected in '{transcript[:50]}']")
 
         if intent == "store" and transcript and confirm_store in ("1", "true", "True"):
             return {
@@ -330,7 +380,21 @@ async def voice(audio: UploadFile = File(...), confirm_store: str = Form("0"), s
                                    emotion=(emo or {}).get("label"),
                                    emotion_intensity=(emo or {}).get("intensity"))
             retrieval_ms = round((time.perf_counter() - t1) * 1000)
-            reply_text = "Got it, I'll remember that."
+            if reply_mode == "persona":
+                # uncle acknowledged the update AND comforted: store + reply persona
+                results = search_memory(transcript, top_k=4, associative=False)
+                reply_text = compose_persona_reply(transcript, results, emo_label)
+                print(f"[persona mode: sad statement STORED + uncle comfort reply]")
+            else:
+                reply_text = "Got it, I'll remember that."
+        elif intent == "unclear_script":
+            # Scribe mis-detected the language (spoken Gujarati -> Cyrillic);
+            # Gemini retry garbled it too. Honest clarification, nothing stored.
+            reply_text = ("I couldn't catch that clearly — Gujarati speech isn't "
+                          "supported by my transcription yet. Try again in English "
+                          "or Hinglish, and I'll answer in Gujarati.")
+        elif intent == "greeting":
+            reply_text = "Hey! Jigo here — tell me something to remember, or ask me anything."
         elif intent == "recall" and transcript:
             t1 = time.perf_counter()
             results = search_memory(transcript, top_k=8, associative=False)
@@ -350,12 +414,10 @@ async def voice(audio: UploadFile = File(...), confirm_store: str = Form("0"), s
                 else:
                     reply_text = compose_reply(transcript, results)
                 answer_ms = round((time.perf_counter() - t_answer) * 1000)
-                if answer:
-                    reply_text = answer
-                    refused = answer.strip() == REFUSAL
-                else:
+                if not reply_text:
                     # LLM unavailable -> graceful degradation: echo best memory
                     reply_text = results[0]["content"]
+                refused = reply_text.strip() == REFUSAL
             else:
                 refused = True
                 reply_text = REFUSAL

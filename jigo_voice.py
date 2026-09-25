@@ -262,7 +262,12 @@ def classify_intent_text(text):
 
 def transcribe_and_classify_with_fallback(filepath):
     """Primary: ElevenLabs Scribe STT (fast, dedicated) + LLM text intent.
-    Fallback: Gemini audio transcription (key-rotating)."""
+    Fallback: Gemini audio transcription (key-rotating).
+
+    Script-sanity guard: Scribe auto-detects language and occasionally returns
+    garbage in an unrelated script (Gujarati speech -> Russian Cyrillic). If the
+    transcript is dominated by characters outside Latin/Devanagari/Gujarati
+    (the scripts our users produce), retry through the Gemini audio path."""
     try:
         with open(filepath, 'rb') as f:
             audio_bytes = f.read()
@@ -270,19 +275,48 @@ def transcribe_and_classify_with_fallback(filepath):
         text = (resp.text or "").strip()
         if text.lower() in ("you,", "okay.", "thank you.", "bye."):
             text = ""  # scribe filler on near-empty clips
+        # script-sanity: Cyrillic/CJK/Hangul chars in a Hinglish user's transcript
+        # mean Scribe mis-detected the language — retry through Gemini audio.
+        cyr = sum(1 for ch in text if '\u0400' <= ch <= '\u04FF'
+                  or '\u4E00' <= ch <= '\u9FFF' or '\uAC00' <= ch <= '\uD7AF')
+        letters = sum(1 for ch in text if ch.isalpha())
+        if text and letters and cyr / letters > 0.3:
+            print(f"[stt guard: scribe returned wrong-script transcript "
+                  f"({cyr}/{letters} foreign chars) -> gemini audio retry]")
+            raise ValueError("script sanity failed")
         intent = _keyword_intent_strong(text) or classify_intent_text(text) or _keyword_intent(text)
         print("[stt: elevenlabs scribe]")
         return {"intent": intent, "text": text}
     except Exception as se:
-        print(f"[scribe unavailable ({str(se)[:70]}) -> gemini audio path]")
+        if "script sanity" not in str(se):
+            print(f"[scribe unavailable ({str(se)[:70]}) -> gemini audio path]")
 
     try:
-        return transcribe_and_classify(filepath)
+        out = transcribe_and_classify(filepath)
+        text = (out.get("text") or "").strip()
+        if _garbage_script(text):
+            # Gemini also returned wrong-script garbage (e.g. spoken Gujarati —
+            # Scribe maps it to Russian; Gemini flash-lite garbles it). Honest
+            # failure: ask the user to rephrase rather than store garbage.
+            print("[stt: gemini retry ALSO returned wrong-script garbage -> unclear_script]")
+            return {"intent": "unclear_script", "text": text}
+        return out
     except Exception as e:
         msg = str(e)
         if "429" in msg or "RESOURCE_EXHAUSTED" in msg or "quota" in msg.lower():
             print("[gemini quota exhausted on all keys]")
         raise
+
+
+def _garbage_script(text):
+    """True when a transcript is dominated by scripts our users never produce
+    (Cyrillic/CJK/Hangul) — the signature of a mis-detected language."""
+    if not text:
+        return False
+    foreign = sum(1 for ch in text if '\u0400' <= ch <= '\u04FF'
+                  or '\u4E00' <= ch <= '\u9FFF' or '\uAC00' <= ch <= '\uD7AF')
+    letters = sum(1 for ch in text if ch.isalpha())
+    return bool(letters) and foreign / letters > 0.3
 
 
 def speak(text):
