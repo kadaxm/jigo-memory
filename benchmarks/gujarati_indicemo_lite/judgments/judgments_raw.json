@@ -1,0 +1,429 @@
+[
+  {
+    "id": "gu_0001",
+    "delivery": "happy",
+    "judge": "gemini_0",
+    "score": 4.5,
+    "note": "Energetic and enthusiastic delivery matching the happy request well.",
+    "ok": true,
+    "ms": 2531
+  },
+  {
+    "id": "gu_0001",
+    "delivery": "happy",
+    "judge": "gemini_1",
+    "score": 4.5,
+    "note": "Energetic and cheerful Gujarati delivery with great enthusiasm.",
+    "ok": true,
+    "ms": 1988
+  },
+  {
+    "id": "gu_0002",
+    "delivery": "happy",
+    "judge": "gemini_0",
+    "score": 4.5,
+    "note": "Very energetic and cheerful delivery fitting the happy mood.",
+    "ok": true,
+    "ms": 2459
+  },
+  {
+    "id": "gu_0002",
+    "delivery": "happy",
+    "judge": "gemini_1",
+    "score": 4.5,
+    "note": "Energetic and enthusiastic delivery with a cheerful tone.",
+    "ok": true,
+    "ms": 2558
+  },
+  {
+    "id": "gu_0003",
+    "delivery": "happy",
+    "judge": "gemini_0",
+    "score": 5.0,
+    "note": "Strong, joyful expression with natural energy and excitement.",
+    "ok": true,
+    "ms": 2540
+  },
+  {
+    "id": "gu_0003",
+    "delivery": "happy",
+    "judge": "gemini_1",
+    "score": 5,
+    "note": "Joyful, energetic, and natural delivery with great enthusiasm.",
+    "ok": true,
+    "ms": 1511
+  },
+  {
+    "id": "gu_0004",
+    "delivery": "happy",
+    "judge": "gemini_0",
+    "score": 4.5,
+    "note": "Energetic and enthusiastic delivery with a cheerful, happy tone.",
+    "ok": true,
+    "ms": 2765
+  },
+  {
+    "id": "gu_0004",
+    "delivery": "happy",
+    "judge": "gemini_1",
+    "score": 5.0,
+    "note": "Very energetic, joyful, and well-sustained expression.",
+    "ok": true,
+    "ms": 1927
+  },
+  {
+    "id": "gu_0005",
+    "delivery": "happy",
+    "judge": "gemini_0",
+    "score": 5,
+    "note": "Joyful and energetic delivery with appropriate excitement.",
+    "ok": true,
+    "ms": 2100
+  },
+  {
+    "id": "gu_0005",
+    "delivery": "happy",
+    "judge": "gemini_1",
+    "score": 5,
+    "note": "High energy and genuine excitement match the happy tone.",
+    "ok": true,
+    "ms": 2141
+  },
+  {
+    "id": "gu_0006",
+    "delivery": "sad",
+    "judge": "gemini_0",
+    "score": 4.0,
+    "note": "Clear sad tone with appropriate emotional weight and pacing.",
+    "ok": true,
+    "ms": 5508
+  },
+  {
+    "id": "gu_0006",
+    "delivery": "sad",
+    "judge": "gemini_1",
+    "score": 2.0,
+    "note": "Subtle sad tone with some flat delivery.",
+    "ok": true,
+    "ms": 2218
+  },
+  {
+    "id": "gu_0007",
+    "delivery": "sad",
+    "judge": "gemini_0",
+    "score": 2.0,
+    "note": "Low expression, lacks appropriate sad tone and projection.",
+    "ok": true,
+    "ms": 2490
+  },
+  {
+    "id": "gu_0007",
+    "delivery": "sad",
+    "judge": "gemini_1",
+    "score": 2.0,
+    "note": "Barely perceptible sad tone.",
+    "ok": true,
+    "ms": 4088
+  },
+  {
+    "id": "gu_0008",
+    "delivery": "sad",
+    "judge": "gemini_0",
+    "score": 4.0,
+    "note": "Clear, sad tone expressing sorrow over a broken friendship.",
+    "ok": true,
+    "ms": 2487
+  },
+  {
+    "id": "gu_0008",
+    "delivery": "sad",
+    "judge": "gemini_1",
+    "score": 4.5,
+    "note": "Expresses sadness well with appropriate tone and pacing.",
+    "ok": true,
+    "ms": 1628
+  },
+  {
+    "id": "gu_0009",
+    "delivery": "sad",
+    "judge": "gemini_0",
+    "ok": false,
+    "error": "429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more info",
+    "ms": 646
+  },
+  {
+    "id": "gu_0009",
+    "delivery": "sad",
+    "judge": "gemini_1",
+    "ok": false,
+    "error": "429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more info",
+    "ms": 633
+  },
+  {
+    "id": "gu_0010",
+    "delivery": "sad",
+    "judge": "gemini_0",
+    "score": 4.0,
+    "note": "Melancholic tone with appropriate pacing and soft delivery.",
+    "ok": true,
+    "ms": 2104
+  },
+  {
+    "id": "gu_0010",
+    "delivery": "sad",
+    "judge": "gemini_1",
+    "score": 4.0,
+    "note": "Clear, sad tone with appropriate slowing and emotion.",
+    "ok": true,
+    "ms": 2679
+  },
+  {
+    "id": "gu_0011",
+    "delivery": "angry",
+    "judge": "gemini_0",
+    "score": 4.5,
+    "note": "Strong angry tone with clear frustration and good dynamics.",
+    "ok": true,
+    "ms": 4130
+  },
+  {
+    "id": "gu_0011",
+    "delivery": "angry",
+    "judge": "gemini_1",
+    "score": 5,
+    "note": "Strong angry tone and delivery fitting the frustrated context.",
+    "ok": true,
+    "ms": 1921
+  },
+  {
+    "id": "gu_0012",
+    "delivery": "angry",
+    "judge": "gemini_0",
+    "score": 1.0,
+    "note": "Flat, monotone delivery without any anger.",
+    "ok": true,
+    "ms": 3325
+  },
+  {
+    "id": "gu_0012",
+    "delivery": "angry",
+    "judge": "gemini_1",
+    "score": 1.0,
+    "note": "Flat, monotone delivery without any anger.",
+    "ok": true,
+    "ms": 3268
+  },
+  {
+    "id": "gu_0013",
+    "delivery": "angry",
+    "judge": "gemini_0",
+    "score": 4.5,
+    "note": "Strong angry tone with expressive delivery and clear phrasing.",
+    "ok": true,
+    "ms": 2426
+  },
+  {
+    "id": "gu_0013",
+    "delivery": "angry",
+    "judge": "gemini_1",
+    "score": 2.0,
+    "note": "Barely perceptible angry tone, mostly flat delivery.",
+    "ok": true,
+    "ms": 1823
+  },
+  {
+    "id": "gu_0014",
+    "delivery": "angry",
+    "judge": "gemini_0",
+    "score": 1.0,
+    "note": "Flat and monotone delivery, lacking any angry emotion.",
+    "ok": true,
+    "ms": 3295
+  },
+  {
+    "id": "gu_0014",
+    "delivery": "angry",
+    "judge": "gemini_1",
+    "score": 1.0,
+    "note": "Flat and monotone delivery, lacking any angry emotion.",
+    "ok": true,
+    "ms": 2141
+  },
+  {
+    "id": "gu_0015",
+    "delivery": "angry",
+    "judge": "gemini_0",
+    "score": 4.0,
+    "note": "Angry and agitated tone with good emphasis.",
+    "ok": true,
+    "ms": 1887
+  },
+  {
+    "id": "gu_0015",
+    "delivery": "angry",
+    "judge": "gemini_1",
+    "score": 4.0,
+    "note": "Angry and agitated tone with good emotional delivery.",
+    "ok": true,
+    "ms": 1612
+  },
+  {
+    "id": "gu_0016",
+    "delivery": "excited",
+    "judge": "gemini_0",
+    "score": 5.0,
+    "note": "Extremely excited and energetic tone with great delivery.",
+    "ok": true,
+    "ms": 1866
+  },
+  {
+    "id": "gu_0016",
+    "delivery": "excited",
+    "judge": "gemini_1",
+    "score": 5.0,
+    "note": "High energy and excitement match the requested delivery style.",
+    "ok": true,
+    "ms": 1985
+  },
+  {
+    "id": "gu_0017",
+    "delivery": "excited",
+    "judge": "gemini_0",
+    "score": 5.0,
+    "note": "High energy and excitement match the requested tone well.",
+    "ok": true,
+    "ms": 1917
+  },
+  {
+    "id": "gu_0017",
+    "delivery": "excited",
+    "judge": "gemini_1",
+    "score": 4.5,
+    "note": "High energy and excitement captured well in delivery.",
+    "ok": true,
+    "ms": 3100
+  },
+  {
+    "id": "gu_0018",
+    "delivery": "excited",
+    "judge": "gemini_0",
+    "ok": false,
+    "error": "429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more info",
+    "ms": 605
+  },
+  {
+    "id": "gu_0018",
+    "delivery": "excited",
+    "judge": "gemini_1",
+    "ok": false,
+    "error": "429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more info",
+    "ms": 477
+  },
+  {
+    "id": "gu_0019",
+    "delivery": "excited",
+    "judge": "gemini_0",
+    "ok": false,
+    "error": "429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more info",
+    "ms": 628
+  },
+  {
+    "id": "gu_0019",
+    "delivery": "excited",
+    "judge": "gemini_1",
+    "score": 5.0,
+    "note": "High energy, enthusiastic, and perfectly matches the excitement.",
+    "ok": true,
+    "ms": 1941
+  },
+  {
+    "id": "gu_0020",
+    "delivery": "excited",
+    "judge": "gemini_0",
+    "score": 5,
+    "note": "High energy, enthusiastic, and perfectly matches the excited tone.",
+    "ok": true,
+    "ms": 8154
+  },
+  {
+    "id": "gu_0020",
+    "delivery": "excited",
+    "judge": "gemini_1",
+    "score": 5.0,
+    "note": "High energy and excitement effectively conveyed in the delivery.",
+    "ok": true,
+    "ms": 1888
+  },
+  {
+    "id": "gu_0021",
+    "delivery": "professional",
+    "judge": "gemini_0",
+    "score": 4.0,
+    "note": "Professional tone with clear phrasing and natural delivery.",
+    "ok": true,
+    "ms": 9135
+  },
+  {
+    "id": "gu_0021",
+    "delivery": "professional",
+    "judge": "gemini_1",
+    "score": 4.0,
+    "note": "Professional tone with clear phrasing and natural delivery.",
+    "ok": true,
+    "ms": 10579
+  },
+  {
+    "id": "gu_0022",
+    "delivery": "professional",
+    "judge": "gemini_0",
+    "score": 4.5,
+    "note": "Clear, professional delivery with good pacing and natural tone.",
+    "ok": true,
+    "ms": 2966
+  },
+  {
+    "id": "gu_0022",
+    "delivery": "professional",
+    "judge": "gemini_1",
+    "score": 4.5,
+    "note": "Clear, professional delivery with good pacing and natural expression.",
+    "ok": true,
+    "ms": 3699
+  },
+  {
+    "id": "gu_0023",
+    "delivery": "professional",
+    "judge": "gemini_0",
+    "score": 4.5,
+    "note": "Professional tone with clear and confident delivery.",
+    "ok": true,
+    "ms": 2893
+  },
+  {
+    "id": "gu_0023",
+    "delivery": "professional",
+    "judge": "gemini_1",
+    "score": 4.5,
+    "note": "Professional tone with clear articulation and good phrasing.",
+    "ok": true,
+    "ms": 1987
+  },
+  {
+    "id": "gu_0024",
+    "delivery": "professional",
+    "judge": "gemini_0",
+    "score": 4.5,
+    "note": "Professional tone with clear and confident delivery.",
+    "ok": true,
+    "ms": 2525
+  },
+  {
+    "id": "gu_0024",
+    "delivery": "professional",
+    "judge": "gemini_1",
+    "score": 4.0,
+    "note": "Clear and professional delivery with good technical explanation.",
+    "ok": true,
+    "ms": 6919
+  }
+]

@@ -1,0 +1,91 @@
+{
+  "method": "MFCC(20) mean+std timbre vector, cosine similarity (approximate speaker/timbre proxy)",
+  "text": "identical Gujarati sentence across all conditions",
+  "anchor_sims_vs_neutral": {
+    "happy": 0.99778813123703,
+    "sad": 0.9968773722648621,
+    "angry": 0.9954723715782166,
+    "excited": 0.9919193387031555,
+    "professional": 0.9977908730506897
+  },
+  "emotion_vs_neutral_mean": 0.9959696173667908,
+  "emotion_vs_neutral_min": 0.9919193387031555,
+  "emotion_vs_neutral_max": 0.9977908730506897,
+  "pairs": [
+    {
+      "a": "neutral",
+      "b": "happy",
+      "cosine": 0.9978
+    },
+    {
+      "a": "neutral",
+      "b": "sad",
+      "cosine": 0.9969
+    },
+    {
+      "a": "neutral",
+      "b": "angry",
+      "cosine": 0.9955
+    },
+    {
+      "a": "neutral",
+      "b": "excited",
+      "cosine": 0.9919
+    },
+    {
+      "a": "neutral",
+      "b": "professional",
+      "cosine": 0.9978
+    },
+    {
+      "a": "happy",
+      "b": "sad",
+      "cosine": 0.9981
+    },
+    {
+      "a": "happy",
+      "b": "angry",
+      "cosine": 0.9917
+    },
+    {
+      "a": "happy",
+      "b": "excited",
+      "cosine": 0.9916
+    },
+    {
+      "a": "happy",
+      "b": "professional",
+      "cosine": 0.9961
+    },
+    {
+      "a": "sad",
+      "b": "angry",
+      "cosine": 0.9899
+    },
+    {
+      "a": "sad",
+      "b": "excited",
+      "cosine": 0.9859
+    },
+    {
+      "a": "sad",
+      "b": "professional",
+      "cosine": 0.9961
+    },
+    {
+      "a": "angry",
+      "b": "excited",
+      "cosine": 0.9926
+    },
+    {
+      "a": "angry",
+      "b": "professional",
+      "cosine": 0.9918
+    },
+    {
+      "a": "excited",
+      "b": "professional",
+      "cosine": 0.9896
+    }
+  ]
+}

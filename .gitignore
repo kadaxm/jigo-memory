@@ -21,9 +21,15 @@ salience_dataset.json
 # side venv (heavy, machine-specific)
 xtts_env/
 
-# interview prep — private, never commit
+# interview prep + mission context — private, never commit
 TRAINING_NOTES.md
+MISSION_NOTES.md
 
 # python cruft
 __pycache__/
 .venv/
+
+# benchmark audio bulk (kept local, data files committed)
+benchmarks/gujarati_indicemo_lite/audio/
+benchmarks/gujarati_indicemo_lite/drift_audio/
+benchmarks/gujarati_indicemo_lite/xtts_audio/

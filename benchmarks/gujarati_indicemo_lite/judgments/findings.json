@@ -1,0 +1,15 @@
+{
+  "n_prompts_with_scores": 22,
+  "n_judge_calls_ok": 43,
+  "n_judge_calls_total": 48,
+  "overall_mean": 4.0,
+  "emotions_only_mean": 3.95,
+  "category_means": {
+    "angry": 2.8,
+    "excited": 4.94,
+    "happy": 4.75,
+    "professional": 4.31,
+    "sad": 3.31
+  },
+  "note": "PRELIMINARY extension, substituted free-tier judge panel (not comparable to IndicEmo published scores)"
+}
