@@ -208,6 +208,7 @@
     <div class="tagline">voice-native memory</div>
   </div>
   <div class="spacer"></div>
+  <button class="chipbtn" id="langChip" title="Speech language hint for transcription: AUTO detects; GU forces Gujarati script; HI forces Hindi; EN forces English">LANG · AUTO</button>
   <button class="chipbtn" id="diagChip" title="Compare all transcription engines per utterance (~3 quota each)">LAB · OFF</button>
   <button class="chipbtn" id="hfChip" title="Auto-listen after each reply — talk without holding">HANDS-FREE · OFF</button>
   <button class="chipbtn" id="memChip">MEMORIES · 0</button>
@@ -239,7 +240,7 @@
 </main>
 
 <footer>
-  mic ▸ <b>gemini</b> transcribe + intent ▸ embed ▸ rank <b>0.6·sim + 0.25·salience + 0.15·recency</b> ▸ gate raw ≥ threshold ▸ <b>elevenlabs</b> tts
+  mic ▸ <b>gemini</b> transcribe + intent ▸ embed ▸ rank <b>0.6·sim + 0.25·salience + 0.05·recency</b> ▸ gate raw ≥ threshold ▸ grounded answer ▸ <b>clone</b> / <b>elevenlabs</b> tts
 </footer>
 
 <!-- confirm-before-store -->
@@ -569,6 +570,13 @@ function floatToWav(data,rate){
 
 /* ---------- lab (engine comparison) ---------- */
 let DIAG=false,lastLab=null;
+const LANGS=["auto","gu","hi","en"];let LANG="auto";
+try{const s=localStorage.getItem("jigoLang");if(LANGS.includes(s))LANG=s;}catch(e){}
+function paintLang(){const c=$("langChip");c.textContent="LANG · "+LANG.toUpperCase();
+  c.style.color=LANG==="auto"?"":"var(--ember)";c.style.borderColor=LANG==="auto"?"":"var(--ember)";}
+$("langChip").addEventListener("click",()=>{LANG=LANGS[(LANGS.indexOf(LANG)+1)%LANGS.length];
+  try{localStorage.setItem("jigoLang",LANG);}catch(e){}paintLang();});
+paintLang();
 $("diagChip").addEventListener("click",()=>{
   DIAG=!DIAG;
   $("diagChip").textContent="LAB · "+(DIAG?"ON":"OFF");
@@ -623,6 +631,7 @@ async function submitVoiceCoreInner(blob){
     fd.append("audio",blob,"rec.wav");
     fd.append("confirm_store","1");
     fd.append("skip_tts","1");
+    fd.append("lang",LANG);
     const res=await fetch("/voice",{method:"POST",body:fd});
     if(!res.ok){
       const d=await res.json().catch(()=>({detail:res.statusText}));
@@ -662,12 +671,35 @@ $("btnRemember").addEventListener("click",async()=>{
   try{
     const res=await fetch("/add",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({content,source:"voice"})});
     if(!res.ok)throw new Error(await res.text());
+    const d=await res.json();
     closeConfirm();
     addStoredLine(content);
-    playCue();
     loadMemories();
-    setStatus("idle");
-    maybeRearm();
+    if(d.bank){
+      // Gujarati line pre-rendered with rumik-oss-1: play instantly, show script + gloss + engine
+      const tl=document.createElement("div");
+      tl.className="turn stored-line";
+      tl.innerHTML="<span class='who'>JIGO</span>"+esc(d.bank.text)
+        +"<div style='opacity:.7;font-size:12px;margin-top:4px'>“"+esc(d.bank.gloss||"")+"”</div>"
+        +"<div class='chips' style='margin-top:6px'><span class='chip gate'>voice <b>rumik-oss-1</b> · Gujarati</span>"
+        +(d.emotion?"<span class='chip'>felt <b>"+esc(d.emotion)+"</b></span>":"")+"</div>";
+      turnsEl.prepend(tl);turnsEl.scrollTop=0;
+      stopAllAudio();
+      const a=new Audio(d.bank.audio_url);activeEls.push(a);wireReplyReactivity(a);
+      a.addEventListener("ended",()=>{const i=activeEls.indexOf(a);if(i>=0)activeEls.splice(i,1);maybeRearm();});
+      a.play().catch(()=>{});
+    }else if(d.reply_text){
+      // persona/roast styled reply — speak it live instead of the cached cue
+      const tl=document.createElement("div");
+      tl.className="turn stored-line";
+      tl.innerHTML="<span class='who'>JIGO</span>"+esc(d.reply_text);
+      turnsEl.prepend(tl);turnsEl.scrollTop=0;
+      speakStreamed(d.reply_text,null);
+    }else{
+      playCue();
+      setStatus("idle");
+      maybeRearm();
+    }
   }catch(e){showError("Store failed: "+e.message);}
   btn.disabled=false;btn.textContent="✓ REMEMBER THIS";
 });

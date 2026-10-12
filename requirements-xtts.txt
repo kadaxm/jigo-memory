@@ -1,0 +1,15 @@
+# side environment (Python 3.11): xtts_env — voice clone server, rumik-oss-1 renderer, speaker-embedding checks
+# torch 2.8 is pinned: >= 2.9 forces torchcodec, whose FFmpeg DLLs are broken on Windows.
+# GPU:  pip install torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cu126
+# CPU:  pip install torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+TTS
+fastapi
+uvicorn
+numpy
+soundfile
+transformers==4.57.1
+bitsandbytes
+librosa
+webrtcvad-wheels
+resemblyzer  # install with --no-deps (its webrtcvad dependency does not build on Windows)
+httpx

@@ -21,9 +21,11 @@ from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
 from emotion import analyze_emotion
+import gu_bank
+from emotion_text import query_feeling, text_emotion
 from llm import _gemini_clients
 from persona import (compose_persona_reply, compose_roast_reply, pick_mode,
-                     PERSONA_ACTIVE)
+                     PERSONA_ACTIVE, ROAST_ACTIVE)
 from jigo_voice import (ANSWER_GATE, REFUSAL, VOICE_ID, looks_like_question,
                         _keyword_intent, compose_reply, eleven_client,
                         transcribe_and_classify_with_fallback)
@@ -36,9 +38,20 @@ _SAD_CONTENT = ("maan kharab", "man kharab", "dukh", "udas", "dukhi", "r roy chh
                 "depressed", "ghabrai", "ghabhray", "dar lag", "anxious", "tension",
                 "nusasan", "haani", "nukshan", "loss", "fail", "kharab chhe",
                 "kharab chhu", "saras nathi", "barbaad",
+                # Scribe mishears Gujarati-accented speech into these English forms
+                "not feeling good", "not feeling well", "not feeling",
                 # Gujarati native script (Scribe sometimes returns it correctly)
                 "મન ખરાબ", "ખરાબ છે", "સરસ નથી", "ઉદાસ", "દુઃખ", "થાકી ગયો",
                 "નથી લાગતું")
+
+# happy-content trigger for roast mode (calm speakers: tone says neutral,
+# content says celebration)
+_HAPPY_CONTENT = ("finally fixed", "finally done", "finally working", "deployed",
+                  "shipped", "launched", "got selected", "got placed", "got the job",
+                  "got an offer", "offer letter", "cracked the", "cracked my",
+                  "cleared the", "passed the", "won the", "got the internship",
+                  "got the position", "published", "first place", "got first",
+                  "milestone", "it works now", "working now", "solved the")
 
 app = FastAPI(title="Jigo Dashboard")
 
@@ -75,12 +88,63 @@ def _sad_content(text):
     return any(k in t for k in _SAD_CONTENT)
 
 
+def _happy_content(text):
+    """Content-level celebration signal for roast mode."""
+    t = " ".join((text or "").lower().split())
+    return any(k in t for k in _HAPPY_CONTENT)
+
+
+_GU_SCRIPT = re.compile("[઀-૿]")
+# romanized Gujarati / Hinglish markers: two or more => speak with Hindi phonology, not English
+_ROMAN_INDIC = {"chhe", "chho", "chhu", "chhi", "nathi", "thai", "jase", "bhai", "kem", "aaj", "maan", "kharab",
+                "saras", "tame", "tamne", "mane", "badhu", "saru", "bahu", "nahi", "hai", "hain", "kya", "kaise",
+                "yaar", "chinta", "kar", "ne", "to", "pan", "ane", "hu", "mari", "tamaru", "su", "shu"}
+_INDIC_LANG = os.getenv("JIGO_TTS_INDIC_LANG", "hi")  # "en" disables the Indic path
+
+
+def _tts_lang_text(text):
+    """(text, xtts_language). XTTS-v2 has no Gujarati. Gujarati script is mapped
+    codepoint-for-codepoint onto Devanagari (the blocks are parallel) and read with
+    Hindi phonology; romanized Gujarati/Hinglish is read as Hindi instead of English
+    (which gave an English accent). Plain English stays 'en'."""
+    if _INDIC_LANG == "en":
+        return text, "en"
+    if _GU_SCRIPT.search(text):
+        mapped = "".join(chr(ord(c) - 0x180) if "઀" <= c <= "૿" else c for c in text)
+        return mapped, _INDIC_LANG
+    words = re.findall(r"[a-z']+", text.lower())
+    if sum(1 for w in words if w in _ROMAN_INDIC) >= 2:
+        return text, _INDIC_LANG
+    return text, "en"
+
+
+_warm = {"t": 0.0}
+
+
+def _kick_warmup():
+    """Load the lazily-unloaded clone model in the background (never blocks a turn)."""
+    import threading
+    now = time.time()
+    if now - _warm["t"] < 150:
+        return
+    _warm["t"] = now
+
+    def _go():
+        try:
+            import httpx
+            httpx.post(f"{CLONE_SERVER}/warmup", timeout=400.0)
+        except Exception:
+            pass
+    threading.Thread(target=_go, daemon=True).start()
+
+
 def _reply_audio(text):
     """Reply voice: local XTTS clone (your voice, free, private) first;
     ElevenLabs stock voice as fallback when the clone server is down or slow."""
     try:
         import httpx
-        r = httpx.post(f"{CLONE_SERVER}/tts", json={"text": text[:600]}, timeout=30.0)
+        ttext, lang = _tts_lang_text(text)
+        r = httpx.post(f"{CLONE_SERVER}/tts", json={"text": ttext[:600], "language": lang}, timeout=30.0)
         if r.status_code == 200 and r.content:
             return r.content, "clone", "wav"
     except Exception as e:
@@ -101,7 +165,11 @@ class AddRequest(BaseModel):
 
 @app.get("/")
 def index():
-    return FileResponse(os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "index.html"))
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "index.html")
+    # no-cache: the browser must always fetch the latest frontend (persona/
+    # roast replies, mode fixes) instead of a stale cached copy
+    return FileResponse(p, headers={"Cache-Control": "no-cache, no-store, must-revalidate",
+                                    "Pragma": "no-cache", "Expires": "0"})
 
 
 @app.get("/health")
@@ -112,11 +180,30 @@ def health():
 @app.get("/config")
 def config():
     """Public values the UI needs (thresholds/half-lives for its decay meters)."""
+    try:  # opening the dashboard starts loading the voice clone if its server is up
+        import httpx
+        h = httpx.get(f"{CLONE_SERVER}/health", timeout=1.0)
+        if h.status_code == 200 and not h.json().get("model_loaded"):
+            _kick_warmup()
+    except Exception:
+        pass
     return {
         "answer_gate": ANSWER_GATE,
         "half_life_days": TYPE_HALF_LIFE_DAYS,
         "gemini_keys_configured": len(_gemini_clients()),
+        "gujarati_bank": gu_bank.status(),
     }
+
+
+@app.get("/gu_audio/{line_id}")
+def gu_audio(line_id: str):
+    """Pre-rendered rumik-oss-1 Gujarati line (see gu_bank.py / render_gu_bank.py)."""
+    if not re.fullmatch(r"[a-z]+_[0-9]{2}", line_id):
+        raise HTTPException(status_code=404)
+    p = gu_bank.audio_path(line_id)
+    if not p:
+        raise HTTPException(status_code=404)
+    return FileResponse(str(p), media_type="audio/wav")
 
 
 @app.get("/memories")
@@ -145,8 +232,37 @@ def delete_memory(memory_id: str):
 
 @app.post("/add")
 def add(req: AddRequest):
+    """Confirm-flow store. Persona/roast styling applies here too: a sad
+    statement gets the uncle's comfort, a celebration gets the roast."""
     memory_id = add_memory(req.content, req.source)
-    return {"id": memory_id, "status": "stored"}
+    reply = "Got it, I'll remember that."
+    mode = None
+    bank = None
+    emo_label, _ = text_emotion(req.content)
+    if _sad_content(req.content) and PERSONA_ACTIVE():
+        mode = "persona"
+        want = emo_label if emo_label in ("sad", "stressed", "angry") else "sad"
+        bank = gu_bank.pick(want)
+        if bank:
+            reply = bank["text"]  # natural Gujarati from rumik-oss, instant (pre-rendered)
+            print(f"[gujarati bank: {bank['id']} for {want}]")
+        else:
+            results = search_memory(req.content, top_k=4, associative=False)
+            reply = compose_persona_reply(req.content, results, "sad")
+            print("[persona mode: confirm-flow store -> comfort reply (bank empty)]")
+    elif emo_label != "neutral" and not (_happy_content(req.content) and ROAST_ACTIVE()):
+        bank = gu_bank.pick(emo_label)
+        if bank:
+            mode, reply = "bank", bank["text"]
+            print(f"[gujarati bank: {bank['id']} for {emo_label}]")
+    elif _happy_content(req.content) and ROAST_ACTIVE():
+        results = search_memory(req.content, top_k=4, associative=False)
+        reply = compose_roast_reply(req.content, results, "happy")
+        mode = "roast"
+        print("[roast mode: confirm-flow store -> demotivator reply]")
+    return {"id": memory_id, "status": "stored",
+            "reply_text": reply if mode else None, "reply_mode": mode, "bank": bank,
+            "emotion": emo_label if emo_label != "neutral" else None}
 
 
 def _scribe_transcribe(wav_path):
@@ -242,10 +358,14 @@ def voice_stream(text: str):
     upstream = None
     try:
         h = httpx.get(f"{CLONE_SERVER}/health", timeout=2.0)
+        if h.status_code == 200 and not h.json().get("model_loaded"):
+            _kick_warmup()  # this turn falls back to ElevenLabs; the next one uses the clone
+            print("[clone model not loaded -> warming up in background, ElevenLabs for this turn]")
         if h.status_code == 200 and h.json().get("model_loaded"):
+            ttext, lang = _tts_lang_text(text)
             upstream = httpx.stream(
                 "POST", f"{CLONE_SERVER}/tts_stream_clone",
-                json={"text": text}, timeout=httpx.Timeout(5.0, read=120.0),
+                json={"text": ttext, "language": lang}, timeout=httpx.Timeout(5.0, read=120.0),
             )
             r = upstream.__enter__()
             if r.status_code == 200:
@@ -291,7 +411,8 @@ def voice_stream(text: str):
 
 
 @app.post("/voice")
-async def voice(audio: UploadFile = File(...), confirm_store: str = Form("0"), skip_tts: str = Form("0")):
+async def voice(audio: UploadFile = File(...), confirm_store: str = Form("0"), skip_tts: str = Form("0"),
+                lang: str = Form("auto")):
     """Full spoken turn: browser mic audio in -> transcript, routing, memory ops, TTS audio out.
 
     confirm_store=1 -> store-intents are NOT written; the client shows the transcript
@@ -315,7 +436,8 @@ async def voice(audio: UploadFile = File(...), confirm_store: str = Form("0"), s
         except Exception:
             audio_s = -1
         print(f"[stt input: {audio_s:.1f}s audio]")
-        result = transcribe_and_classify_with_fallback(tmp_path)
+        result = transcribe_and_classify_with_fallback(
+            tmp_path, language={"gu": "guj", "hi": "hin", "en": "eng"}.get(lang))
         transcribe_ms = (time.perf_counter() - t0) * 1000
         print(f"[stt: {transcribe_ms}ms for {audio_s:.1f}s audio]")
 
@@ -350,13 +472,17 @@ async def voice(audio: UploadFile = File(...), confirm_store: str = Form("0"), s
 
         # persona / roast mode: user-mood triggers a styled reply instead of
         # the neutral grounded answer (uncle calms sadness, roast teases joy)
-        # trigger = detected TONE (emotion.py) OR sad CONTENT (user *says* something
-        # sad in a calm voice: "aaj maan kharab chhe bhai...")
+        # trigger = detected TONE (emotion.py) OR sad/celebration CONTENT (user
+        # *says* something sad/good in a calm voice)
         content_sad = _sad_content(transcript)
+        content_happy = _happy_content(transcript)
         reply_mode = pick_mode(emo_label)
         if not reply_mode and content_sad and PERSONA_ACTIVE():
             reply_mode = "persona"
             print(f"[persona mode: sad CONTENT detected in '{transcript[:50]}']")
+        if not reply_mode and content_happy and ROAST_ACTIVE():
+            reply_mode = "roast"
+            print(f"[roast mode: happy CONTENT detected in '{transcript[:50]}']")
 
         if intent == "store" and transcript and confirm_store in ("1", "true", "True"):
             return {
@@ -385,6 +511,10 @@ async def voice(audio: UploadFile = File(...), confirm_store: str = Form("0"), s
                 results = search_memory(transcript, top_k=4, associative=False)
                 reply_text = compose_persona_reply(transcript, results, emo_label)
                 print(f"[persona mode: sad statement STORED + uncle comfort reply]")
+            elif reply_mode == "roast":
+                results = search_memory(transcript, top_k=4, associative=False)
+                reply_text = compose_roast_reply(transcript, results, emo_label)
+                print(f"[roast mode: happy statement STORED + roast reply]")
             else:
                 reply_text = "Got it, I'll remember that."
         elif intent == "unclear_script":
@@ -397,10 +527,12 @@ async def voice(audio: UploadFile = File(...), confirm_store: str = Form("0"), s
             reply_text = "Hey! Jigo here — tell me something to remember, or ask me anything."
         elif intent == "recall" and transcript:
             t1 = time.perf_counter()
-            results = search_memory(transcript, top_k=8, associative=False)
+            feeling = query_feeling(transcript)  # "what has been stressing me out?" -> "stressed"
+            results = search_memory(transcript, top_k=8, associative=False, feeling=feeling)
             retrieval_ms = round((time.perf_counter() - t1) * 1000)
             gate_score = round(results[0]["raw_similarity"], 3) if results else 0.0
-            if results and results[0]["raw_similarity"] >= ANSWER_GATE:
+            # feeling questions share no words with their answers: the emotion tag is the evidence
+            if results and (results[0]["raw_similarity"] >= ANSWER_GATE or results[0].get("emotion_match")):
                 recalled = [
                     {"content": r["content"], "score": round(r["similarity"], 3),
                      "raw": round(r["raw_similarity"], 3)}

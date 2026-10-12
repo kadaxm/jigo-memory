@@ -1,0 +1,14 @@
+# main environment (Python 3.10+, tested on 3.14 / Windows)
+sentence-transformers
+chromadb
+google-genai
+elevenlabs
+sounddevice
+fastapi
+uvicorn
+python-dotenv
+numpy
+scipy
+scikit-learn
+httpx
+playwright  # optional: UI development only

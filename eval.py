@@ -20,9 +20,10 @@ import chromadb
 from memory import add_memory, search_memory
 
 SCRATCH_NAME = "eval_data"
-# Gate is on RAW embedding similarity (see jigo_voice.py rationale): legit queries
-# score >= 0.72 raw, off-topic <= 0.64 raw on this seed set -> 0.68 splits them.
-SIMILARITY_THRESHOLD = 0.68
+# Production gate (raw embedding similarity pre-filter, calibrated by
+# gate_calibration.py) followed by the grounded LLM that does the real refusing.
+# An adversarial query counts as refused if EITHER layer refuses.
+from jigo_voice import ANSWER_GATE as SIMILARITY_THRESHOLD, REFUSAL, compose_reply
 
 SEED_MEMORIES = [
     "My name is Kadam Vyas",
@@ -107,15 +108,22 @@ def run():
     print(f"\nRETRIEVAL:  top-1 accuracy {top1_hits}/{n} ({100 * top1_hits / n:.0f}%)"
           f"  |  top-3 accuracy {top3_hits}/{n} ({100 * top3_hits / n:.0f}%)")
 
-    print("\nADVERSARIAL (never stored — correct behavior is a REFUSAL, i.e. raw score < "
-          f"{SIMILARITY_THRESHOLD}):")
+    print("\nADVERSARIAL (never stored - correct behavior is a REFUSAL by the gate "
+          f"(raw < {SIMILARITY_THRESHOLD}) or by the grounded LLM):")
     gate_ok = 0
     for q in ADVERSARIAL_QUERIES:
-        results = search_memory(q, top_k=1, associative=False, col=scratch)
+        results = search_memory(q, top_k=8, associative=False, col=scratch)
         raw = results[0]["raw_similarity"] if results else 0.0
-        rejected = raw < SIMILARITY_THRESHOLD
+        if raw < SIMILARITY_THRESHOLD:
+            rejected, layer = True, "gate"
+        else:
+            reply = (compose_reply(q, results) or "").strip().rstrip(".")
+            rejected, layer = reply == REFUSAL.rstrip("."), "LLM"
+            if not rejected:
+                print(f"     LLM answered: {reply[:80]!r}")
         gate_ok += rejected
-        print(f"  '{q}'  -> top raw {raw:.2f}  [{'GATE HELD' if rejected else 'GATE PASSED (would speak wrong answer)'}]")
+        verdict = f"REFUSED by {layer}" if rejected else "ANSWERED (a wrong answer would be spoken)"
+        print(f"  '{q}'  -> top raw {raw:.2f}  [{verdict}]")
 
     total_pairs = n + len(ADVERSARIAL_QUERIES)
     print("\nSUMMARY")

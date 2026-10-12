@@ -1,0 +1,137 @@
+{
+ "sad_01": {
+  "heard": "guj",
+  "prob": 1.0,
+  "ok": true
+ },
+ "sad_02": {
+  "heard": "guj",
+  "prob": 1.0,
+  "ok": true
+ },
+ "sad_03": {
+  "heard": "guj",
+  "prob": 1.0,
+  "ok": true
+ },
+ "sad_04": {
+  "heard": "guj",
+  "prob": 1.0,
+  "ok": true
+ },
+ "sad_05": {
+  "heard": "guj",
+  "prob": 1.0,
+  "ok": true
+ },
+ "sad_06": {
+  "heard": "hin",
+  "prob": 0.88,
+  "ok": false
+ },
+ "stressed_01": {
+  "heard": "guj",
+  "prob": 1.0,
+  "ok": true
+ },
+ "stressed_02": {
+  "heard": "hin",
+  "prob": 0.89,
+  "ok": false
+ },
+ "stressed_03": {
+  "heard": "mar",
+  "prob": 0.55,
+  "ok": false
+ },
+ "stressed_04": {
+  "heard": "guj",
+  "prob": 1.0,
+  "ok": true
+ },
+ "stressed_05": {
+  "heard": "guj",
+  "prob": 1.0,
+  "ok": true
+ },
+ "stressed_06": {
+  "heard": "hin",
+  "prob": 0.88,
+  "ok": false
+ },
+ "angry_01": {
+  "heard": "guj",
+  "prob": 1.0,
+  "ok": true
+ },
+ "angry_02": {
+  "heard": "guj",
+  "prob": 1.0,
+  "ok": true
+ },
+ "angry_03": {
+  "heard": "mar",
+  "prob": 0.75,
+  "ok": false
+ },
+ "happy_01": {
+  "heard": "mar",
+  "prob": 0.65,
+  "ok": false
+ },
+ "happy_02": {
+  "heard": "guj",
+  "prob": 0.97,
+  "ok": true
+ },
+ "happy_03": {
+  "heard": "hin",
+  "prob": 0.61,
+  "ok": false
+ },
+ "happy_04": {
+  "heard": "guj",
+  "prob": 0.97,
+  "ok": true
+ },
+ "excited_01": {
+  "heard": "mar",
+  "prob": 0.96,
+  "ok": false
+ },
+ "excited_02": {
+  "heard": "guj",
+  "prob": 1.0,
+  "ok": true
+ },
+ "general_01": {
+  "heard": "guj",
+  "prob": 0.99,
+  "ok": true
+ },
+ "general_02": {
+  "heard": "guj",
+  "prob": 1.0,
+  "ok": true
+ },
+ "general_03": {
+  "heard": "guj",
+  "prob": 1.0,
+  "ok": true
+ },
+ "general_04": {
+  "heard": "hin",
+  "prob": 0.89,
+  "ok": false
+ },
+ "general_05": {
+  "heard": "mar",
+  "prob": 0.48,
+  "ok": false
+ },
+ "general_06": {
+  "heard": "guj",
+  "prob": 1.0,
+  "ok": true
+ }
+}

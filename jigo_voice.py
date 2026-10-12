@@ -108,10 +108,13 @@ def _keyword_intent(text):
     return "store"  # default: they are telling it something
 
 
-# Recall answer gate on RAW embedding similarity. Relaxed from 0.68 because the
-# response layer (compose_reply) now handles ambiguity intelligently — the gate
-# only needs to decide "worth trying to answer", not "verbatim match".
-ANSWER_GATE = 0.45
+# Recall answer gate on RAW embedding similarity — a cheap PRE-FILTER in front of
+# compose_reply (the grounded LLM that does the real refusing). Calibrated with
+# gate_calibration.py on 52 answerable / 40 unanswerable queries: at the old 0.45
+# it refused 0/40 (unrelated questions score 0.55-0.69 raw); at 0.62 it refuses
+# ~47% of off-topic questions with 0/52 answerable ones lost. The CLI loop above
+# keeps the stricter 0.68 because it speaks the memory verbatim (no LLM layer).
+ANSWER_GATE = 0.62
 
 REFUSAL = "I don't have anything on that yet."
 
@@ -170,7 +173,10 @@ def _age_tag(ts):
 def compose_reply(query, results):
     """LLM-generated conversational answer grounded ONLY in retrieved memories.
     Meta-questions about Jigo itself get a brief in-persona answer."""
-    mem_lines = "\n".join(f"- {_age_tag(r.get('timestamp'))}{_strip_md(r['content'])[:300]}" for r in results[:8])
+    def _felt(r):
+        return f"[felt {r['emotion']}] " if r.get("emotion") else ""
+    mem_lines = "\n".join(
+        f"- {_age_tag(r.get('timestamp'))}{_felt(r)}{_strip_md(r['content'])[:300]}" for r in results[:8])
     prompt = (
         "You are Jigo, a warm voice assistant with a memory. The user asks:\n"
         f"\"{query}\"\n\n"
@@ -184,7 +190,9 @@ def compose_reply(query, results):
         "4. NEVER quote or echo memory titles, headings, or markdown. Speak plain prose.\n"
         "5. If two memories contradict each other (e.g. one says an event is on Tuesday, "
         "another says it moved to Wednesday), the MORE RECENT one is true — state only "
-        "the current fact and silently ignore the outdated one.\n\n"
+        "the current fact and silently ignore the outdated one.\n"
+        "6. A [felt X] tag means the user sounded/said they felt X when they told you that. You may "
+        "acknowledge it in one short, kind clause when it fits; never invent feelings that are not tagged.\n\n"
         "Example — memories: ['- THE REAL QUESTION ISNT WHO AM I: some essay'], "
         "question: \"do you remember me?\" "
         "Good answer: \"Of course I remember you — good to hear from you again!\" "
@@ -260,7 +268,7 @@ def classify_intent_text(text):
         return None
 
 
-def transcribe_and_classify_with_fallback(filepath):
+def transcribe_and_classify_with_fallback(filepath, language=None):
     """Primary: ElevenLabs Scribe STT (fast, dedicated) + LLM text intent.
     Fallback: Gemini audio transcription (key-rotating).
 
@@ -271,7 +279,8 @@ def transcribe_and_classify_with_fallback(filepath):
     try:
         with open(filepath, 'rb') as f:
             audio_bytes = f.read()
-        resp = eleven_client.speech_to_text.convert(model_id="scribe_v1", file=audio_bytes)
+        kw = {"language_code": language} if language else {}  # user-set hint beats auto-detect
+        resp = eleven_client.speech_to_text.convert(model_id="scribe_v1", file=audio_bytes, **kw)
         text = (resp.text or "").strip()
         if text.lower() in ("you,", "okay.", "thank you.", "bye."):
             text = ""  # scribe filler on near-empty clips

@@ -144,22 +144,6 @@
     "ms": 1628
   },
   {
-    "id": "gu_0009",
-    "delivery": "sad",
-    "judge": "gemini_0",
-    "ok": false,
-    "error": "429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more info",
-    "ms": 646
-  },
-  {
-    "id": "gu_0009",
-    "delivery": "sad",
-    "judge": "gemini_1",
-    "ok": false,
-    "error": "429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more info",
-    "ms": 633
-  },
-  {
     "id": "gu_0010",
     "delivery": "sad",
     "judge": "gemini_0",
@@ -304,30 +288,6 @@
     "ms": 3100
   },
   {
-    "id": "gu_0018",
-    "delivery": "excited",
-    "judge": "gemini_0",
-    "ok": false,
-    "error": "429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more info",
-    "ms": 605
-  },
-  {
-    "id": "gu_0018",
-    "delivery": "excited",
-    "judge": "gemini_1",
-    "ok": false,
-    "error": "429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more info",
-    "ms": 477
-  },
-  {
-    "id": "gu_0019",
-    "delivery": "excited",
-    "judge": "gemini_0",
-    "ok": false,
-    "error": "429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more info",
-    "ms": 628
-  },
-  {
     "id": "gu_0019",
     "delivery": "excited",
     "judge": "gemini_1",
@@ -425,5 +385,50 @@
     "note": "Clear and professional delivery with good technical explanation.",
     "ok": true,
     "ms": 6919
+  },
+  {
+    "id": "gu_0009",
+    "delivery": "sad",
+    "judge": "gemini_0",
+    "score": 2.0,
+    "note": "Flat delivery, sad emotion barely noticeable in tone.",
+    "ok": true,
+    "ms": 3514
+  },
+  {
+    "id": "gu_0009",
+    "delivery": "sad",
+    "judge": "gemini_1",
+    "score": 2.0,
+    "note": "Subdued tone with minimal sorrowful emotion.",
+    "ok": true,
+    "ms": 1909
+  },
+  {
+    "id": "gu_0018",
+    "delivery": "excited",
+    "judge": "gemini_0",
+    "score": 5,
+    "note": "High excitement with strong vocal energy and natural delivery.",
+    "ok": true,
+    "ms": 2277
+  },
+  {
+    "id": "gu_0018",
+    "delivery": "excited",
+    "judge": "gemini_1",
+    "score": 5,
+    "note": "Very enthusiastic and expressive delivery matching the excitement well.",
+    "ok": true,
+    "ms": 1663
+  },
+  {
+    "id": "gu_0019",
+    "delivery": "excited",
+    "judge": "gemini_0",
+    "score": 5,
+    "note": "High excitement and energy in the delivery.",
+    "ok": true,
+    "ms": 2038
   }
 ]

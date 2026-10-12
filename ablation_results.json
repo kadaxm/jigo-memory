@@ -1,0 +1,130 @@
+{
+ "gate": 0.62,
+ "n": {
+  "facts": 40,
+  "updates": 12,
+  "abstain": 20,
+  "probes": 4
+ },
+ "llm_conflict_calls": 28,
+ "variants": {
+  "V0 similarity only": {
+   "rows_stored": 108,
+   "recall_top1": 0.975,
+   "recall_top3": 1.0,
+   "update_new_top1": 0.3333333333333333,
+   "update_stale_top1": 0.6666666666666666,
+   "abstain_refused": 0.25,
+   "answerable_wrongly_refused": 0.0,
+   "collateral_victims_lost": 0.0,
+   "unrelated_rows_lost": 0.0,
+   "_lost_examples": []
+  },
+  "V1 + recency": {
+   "rows_stored": 108,
+   "recall_top1": 0.525,
+   "recall_top3": 0.825,
+   "update_new_top1": 0.9166666666666666,
+   "update_stale_top1": 0.08333333333333333,
+   "abstain_refused": 0.55,
+   "answerable_wrongly_refused": 0.2,
+   "collateral_victims_lost": 0.0,
+   "unrelated_rows_lost": 0.0,
+   "_lost_examples": []
+  },
+  "V2 + salience": {
+   "rows_stored": 108,
+   "recall_top1": 0.5,
+   "recall_top3": 0.85,
+   "update_new_top1": 0.9166666666666666,
+   "update_stale_top1": 0.08333333333333333,
+   "abstain_refused": 0.6,
+   "answerable_wrongly_refused": 0.2,
+   "collateral_victims_lost": 0.0,
+   "unrelated_rows_lost": 0.0,
+   "_lost_examples": []
+  },
+  "V3 + associative hop": {
+   "rows_stored": 108,
+   "recall_top1": 0.5,
+   "recall_top3": 0.85,
+   "update_new_top1": 0.9166666666666666,
+   "update_stale_top1": 0.08333333333333333,
+   "abstain_refused": 0.6,
+   "answerable_wrongly_refused": 0.2,
+   "collateral_victims_lost": 0.0,
+   "unrelated_rows_lost": 0.0,
+   "_lost_examples": []
+  },
+  "V4 + conflict (prod)": {
+   "rows_stored": 96,
+   "recall_top1": 0.5,
+   "recall_top3": 0.85,
+   "update_new_top1": 1.0,
+   "update_stale_top1": 0.0,
+   "abstain_refused": 0.7,
+   "answerable_wrongly_refused": 0.2,
+   "collateral_victims_lost": 0.0,
+   "unrelated_rows_lost": 0.0125,
+   "_lost_examples": [
+    "my roommate bought a notebook from the stationery shop"
+   ]
+  },
+  "V5 conflict, phrase-only": {
+   "rows_stored": 101,
+   "recall_top1": 0.5,
+   "recall_top3": 0.85,
+   "update_new_top1": 1.0,
+   "update_stale_top1": 0.0,
+   "abstain_refused": 0.6,
+   "answerable_wrongly_refused": 0.2,
+   "collateral_victims_lost": 0.0,
+   "unrelated_rows_lost": 0.0125,
+   "_lost_examples": [
+    "my roommate bought a notebook from the stationery shop"
+   ]
+  },
+  "V6 prod, recency band": {
+   "rows_stored": 96,
+   "recall_top1": 0.95,
+   "recall_top3": 1.0,
+   "update_new_top1": 0.9166666666666666,
+   "update_stale_top1": 0.08333333333333333,
+   "abstain_refused": 0.35,
+   "answerable_wrongly_refused": 0.0,
+   "collateral_victims_lost": 0.0,
+   "unrelated_rows_lost": 0.0125,
+   "_lost_examples": [
+    "my roommate bought a notebook from the stationery shop"
+   ]
+  },
+  "V7 prod, recency floor": {
+   "rows_stored": 96,
+   "recall_top1": 0.85,
+   "recall_top3": 1.0,
+   "update_new_top1": 1.0,
+   "update_stale_top1": 0.0,
+   "abstain_refused": 0.4,
+   "answerable_wrongly_refused": 0.025,
+   "collateral_victims_lost": 0.0,
+   "unrelated_rows_lost": 0.0125,
+   "_lost_examples": [
+    "my roommate bought a notebook from the stationery shop"
+   ]
+  },
+  "V8 prod, rec weight .05": {
+   "rows_stored": 96,
+   "recall_top1": 0.925,
+   "recall_top3": 1.0,
+   "update_new_top1": 1.0,
+   "update_stale_top1": 0.0,
+   "abstain_refused": 0.35,
+   "answerable_wrongly_refused": 0.0,
+   "collateral_victims_lost": 0.0,
+   "unrelated_rows_lost": 0.0125,
+   "_lost_examples": [
+    "my roommate bought a notebook from the stationery shop"
+   ]
+  }
+ }
+}

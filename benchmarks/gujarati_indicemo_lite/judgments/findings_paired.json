@@ -1,0 +1,66 @@
+{
+ "paired": {
+  "happy": {
+   "n": 5,
+   "delivery_mean": 4.75,
+   "neutral_mean": 4.7,
+   "delta_mean": 0.05,
+   "ci95": [
+    -0.2,
+    0.3
+   ]
+  },
+  "excited": {
+   "n": 5,
+   "delivery_mean": 4.95,
+   "neutral_mean": 4.8,
+   "delta_mean": 0.15,
+   "ci95": [
+    -0.15,
+    0.6
+   ]
+  },
+  "sad": {
+   "n": 5,
+   "delivery_mean": 3.05,
+   "neutral_mean": 2.05,
+   "delta_mean": 1.0,
+   "ci95": [
+    0.2,
+    1.8
+   ]
+  },
+  "angry": {
+   "n": 5,
+   "delivery_mean": 2.8,
+   "neutral_mean": 2.65,
+   "delta_mean": 0.15,
+   "ci95": [
+    -1.1,
+    1.65
+   ]
+  },
+  "professional": {
+   "n": 4,
+   "delivery_mean": 4.312,
+   "neutral_mean": 4.312,
+   "delta_mean": 0.0,
+   "ci95": [
+    -0.188,
+    0.188
+   ]
+  },
+  "ALL": {
+   "n": 24,
+   "delivery_mean": 3.958,
+   "neutral_mean": 3.677,
+   "delta_mean": 0.281,
+   "ci95": [
+    -0.073,
+    0.677
+   ]
+  }
+ },
+ "judge_key_mean_abs_diff": 0.302,
+ "note": "single judge model (gemini flash-lite) via 2 API keys; free-tier; preliminary"
+}

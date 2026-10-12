@@ -8,6 +8,7 @@ import re
 import os
 import sys
 
+import numpy as np
 import llm
 from dotenv import load_dotenv
 
@@ -25,9 +26,11 @@ CONFLICT_SIMILARITY_THRESHOLD = 0.75
 TEMPORAL_UPDATE_SIMILARITY = 0.55   # explicit update phrasing lowers the overwrite bar
 SIMILARITY_WEIGHT = 0.6
 SALIENCE_WEIGHT = 0.25
-RECENCY_WEIGHT = 0.15
+RECENCY_WEIGHT = 0.05   # was 0.15: at 0.15, old-but-stable facts lost top-1 to fresh irrelevant rows (ablation_memory.py: top-1 0.97 -> 0.50)
 ASSOCIATIVE_NEIGHBORS = 2   # how many extra "related" memories to pull per top match
 ASSOCIATIVE_WEIGHT = 0.5    # neighbors compete at half strength so they only surface when nothing strong exists
+EMOTION_HALF_LIFE_BOOST = 2.0   # intensity 1.0 -> half-life x3
+EMOTION_MATCH_WEIGHT = 0.30     # added to the blended score when the query asks about a feeling the memory carries
 TYPE_HALF_LIFE_DAYS = {
     "episodic": 7,      # events go stale fast
     "semantic": 30,     # facts about identity/goals stay relevant longer
@@ -108,7 +111,13 @@ _ensure_cosine_space()
 # ---------- LLM helpers ----------
 
 def _llm_judge(prompt):
-    return llm.chat_json(prompt, max_tokens=200, temperature=0.2)
+    # Short structured judgments (salience, conflict) go to the fast model first:
+    # the premium chain was returning 404/429 and _check_conflict then silently
+    # answered "no conflict", leaving stale facts in place.
+    try:
+        return llm.chat_json(prompt, max_tokens=200, temperature=0.2, model_hint="fast_gemini")
+    except Exception:
+        return llm.chat_json(prompt, max_tokens=200, temperature=0.2)
 
 
 def _score_salience(content):
@@ -128,8 +137,15 @@ def _check_conflict(new_content, existing_content):
     prompt = (
         f'Existing memory: "{existing_content}"\n'
         f'New statement: "{new_content}"\n'
-        'Does the new statement contradict, correct, or update the existing memory '
-        '(e.g. a changed fact, a moved location, a new job replacing an old one)? '
+        'Is the new statement a REPLACEMENT for the existing memory: the same single fact '
+        '(one slot, e.g. where I live, my phone, my team lead, a meeting time) now having a '
+        'different value, so that both cannot be true at the same time?\n'
+        'Answer false when both can be true together - e.g. visiting two different places, '
+        'buying two different things, two different people, two different hobbies, or one '
+        'statement merely adding detail to the other.\n'
+        'Examples: "I live in Delhi" vs "I moved to Bangalore" -> true. '
+        '"I visited Paris in 2019" vs "I visited Rome in 2021" -> false. '
+        '"My uncle collects stamps" vs "My uncle drives a taxi" -> false.\n'
         'Respond ONLY with JSON: {"conflict": true or false}'
     )
     try:
@@ -178,9 +194,11 @@ def _classify_memory_type(content):
 
 # ---------- Recency ----------
 
-def _recency_score(timestamp, memory_type="semantic"):
+def _recency_score(timestamp, memory_type="semantic", emotion_intensity=0.0):
     age_days = (time.time() - timestamp) / 86400
     half_life = TYPE_HALF_LIFE_DAYS.get(memory_type, TYPE_HALF_LIFE_DAYS["semantic"])
+    # emotionally charged memories fade slower (up to 1 + EMOTION_HALF_LIFE_BOOST x)
+    half_life *= 1.0 + EMOTION_HALF_LIFE_BOOST * max(0.0, min(1.0, emotion_intensity or 0.0))
     return math.exp(-age_days * (math.log(2) / half_life))
 
 
@@ -202,6 +220,13 @@ def add_memory(content, source="manual", col=None, emotion=None, emotion_intensi
     embedding = model.encode(content).tolist()
     memory_type = _classify_memory_type(content)
     salience, salience_src = _salience_for(content, embedding)
+    # emotion: words first (reliable), voice prosody only as a weak fallback
+    try:
+        import emotion_text
+        emotion, emotion_intensity = emotion_text.merge_emotion(
+            emotion_text.text_emotion(content), emotion, emotion_intensity)
+    except Exception:
+        pass
 
     # temporal-update phrasing ("moved to...", "actually...") means the user is
     # correcting something they already said — accept a much weaker embedding
@@ -216,10 +241,9 @@ def add_memory(content, source="manual", col=None, emotion=None, emotion_intensi
             "timestamp": time.time(),
             "type": memory_type,
         }
-        if emotion:
+        if emotion and emotion != "neutral":
             m["emotion"] = emotion
-        if emotion_intensity is not None:
-            m["emotion_intensity"] = float(emotion_intensity)
+            m["emotion_intensity"] = float(emotion_intensity or 0.0)
         return m
 
     existing = col.query(query_embeddings=[embedding], n_results=1)
@@ -243,7 +267,7 @@ def add_memory(content, source="manual", col=None, emotion=None, emotion_intensi
 
 # ---------- Search with associative retrieval ----------
 
-def search_memory(query, top_k=3, associative=True, col=None):
+def search_memory(query, top_k=3, associative=True, col=None, feeling=None):
     """
     Retrieve up to top_k direct hits ranked by similarity+salience+recency.
     If associative=True, also pulls ASSOCIATIVE_NEIGHBORS related memories for the single
@@ -251,6 +275,12 @@ def search_memory(query, top_k=3, associative=True, col=None):
     ASSOCIATIVE_WEIGHT, tagged is_associative, and appended to the returned list — so they
     rank below any strong direct hit but still surface as "related" extras (list length
     can exceed top_k; filter on is_associative if strict top_k semantics are needed).
+
+    feeling: a label from emotion_text.query_feeling() when the user is asking about
+    how they felt ("what has been stressing me out?"). Memories stored with a matching
+    emotion get EMOTION_MATCH_WEIGHT x intensity added ("any" matches every emotional
+    memory at half strength). Such queries share no words with the memories they want,
+    so similarity alone cannot find them. Rows carry `emotion_match` for the answer gate.
     """
     col = col or collection
     query_embedding = model.encode(query).tolist()
@@ -262,15 +292,35 @@ def search_memory(query, top_k=3, associative=True, col=None):
     if not results["documents"] or not results["documents"][0]:
         return []
 
-    docs = results["documents"][0]
-    distances = results["distances"][0]
-    metadatas = results["metadatas"][0]
-    ids = results["ids"][0]
+    docs = list(results["documents"][0])
+    distances = list(results["distances"][0])
+    metadatas = list(results["metadatas"][0])
+    ids = list(results["ids"][0])
+
+    if feeling:
+        # feeling queries share no words with the memories they want, so those rows
+        # are not in the similarity top-N: pull every emotion-tagged row explicitly.
+        where = ({"emotion": feeling} if feeling != "any"
+                 else {"emotion": {"$in": ["sad", "stressed", "angry", "happy", "excited"]}})
+        try:
+            tagged = col.get(where=where, include=["documents", "metadatas", "embeddings"])
+            q = np.asarray(query_embedding, dtype=np.float32)
+            for tid, tdoc, tmeta, temb in zip(tagged["ids"], tagged["documents"],
+                                              tagged["metadatas"], tagged["embeddings"]):
+                if tid in ids:
+                    continue
+                e = np.asarray(temb, dtype=np.float32)
+                cos = float(q @ e / ((np.linalg.norm(q) * np.linalg.norm(e)) or 1.0))
+                ids.append(tid); docs.append(tdoc); metadatas.append(tmeta); distances.append(1.0 - cos)
+        except Exception:
+            pass  # no tagged rows / older collection: fall back to plain similarity
 
     def _score_row(doc, dist, meta, doc_id):
         raw_similarity = 1 / (1 + dist)
         salience = meta.get("salience", 0.5)
-        recency = _recency_score(meta.get("timestamp", time.time()), meta.get("type", "semantic"))
+        emo_label = meta.get("emotion")
+        emo_int = meta.get("emotion_intensity", 0.0) if emo_label else 0.0
+        recency = _recency_score(meta.get("timestamp", time.time()), meta.get("type", "semantic"), emo_int)
         # Salience ranking band: the distilled head's ordering is imperfect
         # (Spearman ~0.55 vs the LLM teacher), so its full 0-1 spread let
         # high-salience memories dominate unrelated queries (eval top-1 fell
@@ -283,9 +333,19 @@ def search_memory(query, top_k=3, associative=True, col=None):
             + SALIENCE_WEIGHT * salience_band
             + RECENCY_WEIGHT * recency
         )
+        emotion_match = 0.0
+        if feeling and emo_label:
+            if feeling == emo_label:
+                emotion_match = emo_int
+            elif feeling == "any":
+                emotion_match = 0.5 * emo_int
+        final_score += EMOTION_MATCH_WEIGHT * emotion_match
         return {
             "id": doc_id,
             "content": doc,
+            "emotion": emo_label,
+            "emotion_intensity": emo_int,
+            "emotion_match": emotion_match > 0,
             "similarity": final_score,
             "raw_similarity": raw_similarity,
             "salience": salience,

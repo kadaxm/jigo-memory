@@ -1,0 +1,482 @@
+[
+  {
+    "id": "gu_0001",
+    "delivery": "happy",
+    "judge": "gemini_0",
+    "clip": "neutral",
+    "score": 4.0,
+    "note": "Clear, happy Gujarati delivery with good energy and emotion.",
+    "ok": true,
+    "ms": 3107
+  },
+  {
+    "id": "gu_0001",
+    "delivery": "happy",
+    "judge": "gemini_1",
+    "clip": "neutral",
+    "score": 4.0,
+    "note": "Energetic Gujarati delivery with clear excitement and cheerful tone.",
+    "ok": true,
+    "ms": 2173
+  },
+  {
+    "id": "gu_0002",
+    "delivery": "happy",
+    "judge": "gemini_0",
+    "clip": "neutral",
+    "score": 4.5,
+    "note": "Energetic and happy delivery with great emotional tone.",
+    "ok": true,
+    "ms": 2087
+  },
+  {
+    "id": "gu_0002",
+    "delivery": "happy",
+    "judge": "gemini_1",
+    "clip": "neutral",
+    "score": 5.0,
+    "note": "Perfectly captures the happy and excited tone.",
+    "ok": true,
+    "ms": 2367
+  },
+  {
+    "id": "gu_0003",
+    "delivery": "happy",
+    "judge": "gemini_0",
+    "clip": "neutral",
+    "score": 5,
+    "note": "Joyful and expressive delivery with natural tone and pacing.",
+    "ok": true,
+    "ms": 2201
+  },
+  {
+    "id": "gu_0003",
+    "delivery": "happy",
+    "judge": "gemini_1",
+    "clip": "neutral",
+    "score": 5.0,
+    "note": "Joyful, expressive tone with clear and natural delivery.",
+    "ok": true,
+    "ms": 2211
+  },
+  {
+    "id": "gu_0004",
+    "delivery": "happy",
+    "judge": "gemini_0",
+    "clip": "neutral",
+    "score": 5,
+    "note": "Joyful and energetic tone, perfectly matches the happy request.",
+    "ok": true,
+    "ms": 2430
+  },
+  {
+    "id": "gu_0004",
+    "delivery": "happy",
+    "judge": "gemini_1",
+    "clip": "neutral",
+    "score": 5,
+    "note": "Joyful and energetic tone, perfectly matching the happy request.",
+    "ok": true,
+    "ms": 1747
+  },
+  {
+    "id": "gu_0005",
+    "delivery": "happy",
+    "judge": "gemini_0",
+    "clip": "neutral",
+    "score": 4.5,
+    "note": "Enthusiastic and expressive delivery matching the happy mood.",
+    "ok": true,
+    "ms": 2073
+  },
+  {
+    "id": "gu_0005",
+    "delivery": "happy",
+    "judge": "gemini_1",
+    "clip": "neutral",
+    "score": 5.0,
+    "note": "Very energetic and joyful expression matching the happy delivery.",
+    "ok": true,
+    "ms": 1719
+  },
+  {
+    "id": "gu_0006",
+    "delivery": "sad",
+    "judge": "gemini_0",
+    "clip": "neutral",
+    "score": 1.0,
+    "note": "Failed to deliver the requested sad emotion.",
+    "ok": true,
+    "ms": 2164
+  },
+  {
+    "id": "gu_0006",
+    "delivery": "sad",
+    "judge": "gemini_1",
+    "clip": "neutral",
+    "score": 1.0,
+    "note": "The delivery is completely flat and lacks sadness.",
+    "ok": true,
+    "ms": 1815
+  },
+  {
+    "id": "gu_0007",
+    "delivery": "sad",
+    "judge": "gemini_0",
+    "clip": "neutral",
+    "score": 1.0,
+    "note": "Flat, monotone delivery without any sadness.",
+    "ok": true,
+    "ms": 2243
+  },
+  {
+    "id": "gu_0007",
+    "delivery": "sad",
+    "judge": "gemini_1",
+    "clip": "neutral",
+    "score": 1.0,
+    "note": "Flat, monotone delivery without any sad emotion.",
+    "ok": true,
+    "ms": 1791
+  },
+  {
+    "id": "gu_0008",
+    "delivery": "sad",
+    "judge": "gemini_0",
+    "clip": "neutral",
+    "score": 2.5,
+    "note": "Subdued tone with some sadness, but delivery is weak.",
+    "ok": true,
+    "ms": 2222
+  },
+  {
+    "id": "gu_0008",
+    "delivery": "sad",
+    "judge": "gemini_1",
+    "clip": "neutral",
+    "score": 2.0,
+    "note": "Low emotional resonance, reads more flat than sad.",
+    "ok": true,
+    "ms": 1684
+  },
+  {
+    "id": "gu_0012",
+    "delivery": "angry",
+    "judge": "gemini_1",
+    "clip": "neutral",
+    "score": 1.0,
+    "note": "Flat, monotone delivery without any anger.",
+    "ok": true,
+    "ms": 2105
+  },
+  {
+    "id": "gu_0013",
+    "delivery": "angry",
+    "judge": "gemini_0",
+    "clip": "neutral",
+    "score": 4.5,
+    "note": "Angry tone is well conveyed through stress and volume.",
+    "ok": true,
+    "ms": 2728
+  },
+  {
+    "id": "gu_0013",
+    "delivery": "angry",
+    "judge": "gemini_1",
+    "clip": "neutral",
+    "score": 4.5,
+    "note": "Angry and assertive tone with clear, strong expression.",
+    "ok": true,
+    "ms": 1663
+  },
+  {
+    "id": "gu_0014",
+    "delivery": "angry",
+    "judge": "gemini_0",
+    "clip": "neutral",
+    "score": 1.0,
+    "note": "Flat and monotone delivery, lacking any anger.",
+    "ok": true,
+    "ms": 2269
+  },
+  {
+    "id": "gu_0014",
+    "delivery": "angry",
+    "judge": "gemini_1",
+    "clip": "neutral",
+    "score": 1.0,
+    "note": "Flat and monotone delivery, lacking the requested angry tone.",
+    "ok": true,
+    "ms": 1562
+  },
+  {
+    "id": "gu_0015",
+    "delivery": "angry",
+    "judge": "gemini_0",
+    "clip": "neutral",
+    "score": 1.0,
+    "note": "Flat and monotone delivery, lacking the requested angry tone.",
+    "ok": true,
+    "ms": 2784
+  },
+  {
+    "id": "gu_0015",
+    "delivery": "angry",
+    "judge": "gemini_1",
+    "clip": "neutral",
+    "score": 1.0,
+    "note": "Flat and monotone delivery, lacking the requested angry emotion.",
+    "ok": true,
+    "ms": 1629
+  },
+  {
+    "id": "gu_0016",
+    "delivery": "excited",
+    "judge": "gemini_0",
+    "clip": "neutral",
+    "score": 5.0,
+    "note": "Very energetic and enthusiastic delivery, capturing the excited tone.",
+    "ok": true,
+    "ms": 1964
+  },
+  {
+    "id": "gu_0016",
+    "delivery": "excited",
+    "judge": "gemini_1",
+    "clip": "neutral",
+    "score": 5.0,
+    "note": "Very enthusiastic and engaging delivery with high energy.",
+    "ok": true,
+    "ms": 1939
+  },
+  {
+    "id": "gu_0017",
+    "delivery": "excited",
+    "judge": "gemini_0",
+    "clip": "neutral",
+    "score": 5.0,
+    "note": "Very energetic and excited tone, perfectly matching the request.",
+    "ok": true,
+    "ms": 2204
+  },
+  {
+    "id": "gu_0017",
+    "delivery": "excited",
+    "judge": "gemini_1",
+    "clip": "neutral",
+    "score": 5.0,
+    "note": "Great excited tone matching the joyous travel announcement.",
+    "ok": true,
+    "ms": 2126
+  },
+  {
+    "id": "gu_0018",
+    "delivery": "excited",
+    "judge": "gemini_0",
+    "clip": "neutral",
+    "score": 5.0,
+    "note": "Strong, natural, and excited tone conveying happy news.",
+    "ok": true,
+    "ms": 1992
+  },
+  {
+    "id": "gu_0018",
+    "delivery": "excited",
+    "judge": "gemini_1",
+    "clip": "neutral",
+    "score": 5.0,
+    "note": "Excited and energetic delivery matching the requested tone well.",
+    "ok": true,
+    "ms": 1782
+  },
+  {
+    "id": "gu_0019",
+    "delivery": "excited",
+    "judge": "gemini_0",
+    "clip": "neutral",
+    "score": 3.0,
+    "note": "Excited tone is recognizable with good energy.",
+    "ok": true,
+    "ms": 2134
+  },
+  {
+    "id": "gu_0019",
+    "delivery": "excited",
+    "judge": "gemini_1",
+    "clip": "neutral",
+    "score": 5,
+    "note": "Energetic and enthusiastic delivery with appropriate excitement and pace.",
+    "ok": true,
+    "ms": 1646
+  },
+  {
+    "id": "gu_0020",
+    "delivery": "excited",
+    "judge": "gemini_0",
+    "clip": "neutral",
+    "score": 5.0,
+    "note": "Strong, enthusiastic expression matching the exciting news well.",
+    "ok": true,
+    "ms": 2191
+  },
+  {
+    "id": "gu_0023",
+    "delivery": "professional",
+    "judge": "gemini_1",
+    "clip": "neutral",
+    "score": 4.5,
+    "note": "Professional tone with clear and confident delivery.",
+    "ok": true,
+    "ms": 2058
+  },
+  {
+    "id": "gu_0024",
+    "delivery": "professional",
+    "judge": "gemini_0",
+    "clip": "neutral",
+    "score": 4.5,
+    "note": "Professional delivery with appropriate tone and clear phrasing.",
+    "ok": true,
+    "ms": 2057
+  },
+  {
+    "id": "gu_0024",
+    "delivery": "professional",
+    "judge": "gemini_1",
+    "clip": "neutral",
+    "score": 4.5,
+    "note": "Professional delivery with appropriate technical emphasis and clear phrasing.",
+    "ok": true,
+    "ms": 1849
+  },
+  {
+    "id": "gu_0009",
+    "delivery": "sad",
+    "judge": "gemini_0",
+    "clip": "neutral",
+    "score": 2.0,
+    "note": "Subtle sad tone with minor hints in phrasing.",
+    "ok": true,
+    "ms": 2113
+  },
+  {
+    "id": "gu_0009",
+    "delivery": "sad",
+    "judge": "gemini_1",
+    "clip": "neutral",
+    "score": 2.0,
+    "note": "Low emotional resonance, lacks the sadness in tone.",
+    "ok": true,
+    "ms": 2085
+  },
+  {
+    "id": "gu_0010",
+    "delivery": "sad",
+    "judge": "gemini_0",
+    "clip": "neutral",
+    "score": 4.0,
+    "note": "Expressive delivery conveys sadness with a downcast tone.",
+    "ok": true,
+    "ms": 2357
+  },
+  {
+    "id": "gu_0010",
+    "delivery": "sad",
+    "judge": "gemini_1",
+    "clip": "neutral",
+    "score": 4.0,
+    "note": "Expressive delivery conveys sadness with a downcast tone.",
+    "ok": true,
+    "ms": 3412
+  },
+  {
+    "id": "gu_0011",
+    "delivery": "angry",
+    "judge": "gemini_0",
+    "clip": "neutral",
+    "score": 4.5,
+    "note": "Strong, angry tone match with clear, expressive delivery.",
+    "ok": true,
+    "ms": 2493
+  },
+  {
+    "id": "gu_0011",
+    "delivery": "angry",
+    "judge": "gemini_1",
+    "clip": "neutral",
+    "score": 4.0,
+    "note": "Angry and accusatory tone, well-conveyed in Gujarati-English.",
+    "ok": true,
+    "ms": 3859
+  },
+  {
+    "id": "gu_0012",
+    "delivery": "angry",
+    "judge": "gemini_0",
+    "clip": "neutral",
+    "score": 4.0,
+    "note": "Angry tone is clear and convincing throughout the speech.",
+    "ok": true,
+    "ms": 1716
+  },
+  {
+    "id": "gu_0020",
+    "delivery": "excited",
+    "judge": "gemini_1",
+    "clip": "neutral",
+    "score": 5.0,
+    "note": "Strong, excited, and dynamic delivery in Gujarati.",
+    "ok": true,
+    "ms": 16913
+  },
+  {
+    "id": "gu_0021",
+    "delivery": "professional",
+    "judge": "gemini_0",
+    "clip": "neutral",
+    "score": 3.5,
+    "note": "Professional tone with clear phrasing, though slightly conversational.",
+    "ok": true,
+    "ms": 2775
+  },
+  {
+    "id": "gu_0021",
+    "delivery": "professional",
+    "judge": "gemini_1",
+    "clip": "neutral",
+    "score": 4.0,
+    "note": "Professional tone and clear pacing in code-switched delivery.",
+    "ok": true,
+    "ms": 2049
+  },
+  {
+    "id": "gu_0022",
+    "delivery": "professional",
+    "judge": "gemini_0",
+    "clip": "neutral",
+    "score": 4.5,
+    "note": "Clear, professional delivery with good technical pacing and tone.",
+    "ok": true,
+    "ms": 2533
+  },
+  {
+    "id": "gu_0022",
+    "delivery": "professional",
+    "judge": "gemini_1",
+    "clip": "neutral",
+    "score": 4.5,
+    "note": "Clear and professional delivery with good pacing.",
+    "ok": true,
+    "ms": 2016
+  },
+  {
+    "id": "gu_0023",
+    "delivery": "professional",
+    "judge": "gemini_0",
+    "clip": "neutral",
+    "score": 4.5,
+    "note": "Professional tone and steady delivery with good code-switching.",
+    "ok": true,
+    "ms": 2172
+  }
+]

@@ -92,6 +92,18 @@ def health():
     }
 
 
+@app.post("/warmup")
+def warmup():
+    """Load the model now (blocks ~85 s on first call). web_ui calls this in the
+    background the first time a reply is needed while the model is unloaded -
+    without it the lazy-load default meant the dashboard fell back to the stock
+    ElevenLabs voice forever (it only streams from a server that is already loaded)."""
+    global _last_use
+    _engine()
+    _last_use = time.time()
+    return {"model_loaded": _tts is not None, "device": _device}
+
+
 def _synth(text, language, cloned):
     """Synthesize on the active device; on CUDA OOM, move to CPU and retry."""
     global _last_use

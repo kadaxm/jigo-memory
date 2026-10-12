@@ -164,3 +164,13 @@ def pick_mode(emo_label):
     if ROAST_MODE and label in ROAST_TRIGGERS:
         return "roast"
     return None
+
+
+def PERSONA_ACTIVE():
+    """Whether uncle mode is enabled (env-controlled)."""
+    return PERSONA_MODE
+
+
+def ROAST_ACTIVE():
+    """Whether roast mode is enabled (env-controlled)."""
+    return ROAST_MODE

@@ -33,3 +33,15 @@ __pycache__/
 benchmarks/gujarati_indicemo_lite/audio/
 benchmarks/gujarati_indicemo_lite/drift_audio/
 benchmarks/gujarati_indicemo_lite/xtts_audio/
+
+# private drafts (email to Rumik etc.) - never commit
+PRIVATE_*.md
+
+# generated samples derived from the personal voice clone
+tts_samples/
+
+# Gujarati line bank: model-generated TTS, safe to publish
+!gu_bank/audio/*.wav
+
+# harness caches
+gate_e2e_cache.json
