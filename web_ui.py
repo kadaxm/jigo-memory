@@ -100,6 +100,9 @@ _ROMAN_INDIC = {"chhe", "chho", "chhu", "chhi", "nathi", "thai", "jase", "bhai",
                 "saras", "tame", "tamne", "mane", "badhu", "saru", "bahu", "nahi", "hai", "hain", "kya", "kaise",
                 "yaar", "chinta", "kar", "ne", "to", "pan", "ane", "hu", "mari", "tamaru", "su", "shu"}
 _INDIC_LANG = os.getenv("JIGO_TTS_INDIC_LANG", "hi")  # "en" disables the Indic path
+# "auto": clone first, ElevenLabs fallback. "eleven": skip the clone entirely - on a loaded 4 GB
+# laptop the clone ran at 2x slower than realtime (gaps/glitches while streaming).
+TTS_ENGINE = os.getenv("JIGO_TTS_ENGINE", "auto")
 
 
 def _tts_lang_text(text):
@@ -142,6 +145,8 @@ def _reply_audio(text):
     """Reply voice: local XTTS clone (your voice, free, private) first;
     ElevenLabs stock voice as fallback when the clone server is down or slow."""
     try:
+        if TTS_ENGINE == "eleven":
+            raise RuntimeError("clone disabled by JIGO_TTS_ENGINE=eleven")
         import httpx
         ttext, lang = _tts_lang_text(text)
         r = httpx.post(f"{CLONE_SERVER}/tts", json={"text": ttext[:600], "language": lang}, timeout=30.0)
@@ -357,6 +362,8 @@ def voice_stream(text: str):
 
     upstream = None
     try:
+        if TTS_ENGINE == "eleven":
+            raise RuntimeError("clone disabled by JIGO_TTS_ENGINE=eleven")
         h = httpx.get(f"{CLONE_SERVER}/health", timeout=2.0)
         if h.status_code == 200 and not h.json().get("model_loaded"):
             _kick_warmup()  # this turn falls back to ElevenLabs; the next one uses the clone

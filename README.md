@@ -109,7 +109,7 @@ hand-written (stated per row); the free-tier LLM is the only judge/answerer.
 | STT latency (Scribe, 5 s clip) | **~2.1 s** typical | LAB comparison |
 | Scribe on Gujarati clips | **CER ≈ 0.10–0.13** on 8 synthetic clips, Gujarati script, when the language is given | `benchmarks/gujarati_indicemo_lite/` |
 | TTS synthesis (8 s of speech) | **6.9 s on GPU vs 64.7 s on CPU — 9.4×** | `voice_server.py` benchmark |
-| Streaming reply first-audio | **~3.9 s** (sentence-chunked clone stream) | `/voice_stream` |
+| Streaming reply first-audio | **~3.9 s** (sentence-chunked clone stream, idle machine). Under memory pressure (≈1 GB free RAM, screen recorder running) the same stream measured **2.15× slower than realtime** with an 8.7 s mid-reply gap | `/voice_stream` |
 | Gujarati line bank (rumik-oss-1) | **17 / 27** lines heard as Gujarati by Scribe; only those play | `verify_gu_bank.py` |
 
 **Evaluation of rumik-oss-1 on Gujarati** (24 prompts, 5 deliveries, one free Gemini judge — preliminary)
@@ -289,6 +289,12 @@ First run downloads the embedding model (~420 MB). The vector store persists to
 `./chroma_memory/`.
 
 ## Notes & trade-offs
+
+- **The clone is only comfortable on an idle 8 GB machine.** XTTS-v2 runs near realtime
+  (RTF ≈ 0.86) when the laptop is otherwise free, but ~2× slower than realtime when RAM is
+  tight, which shows up as gaps while a reply streams. `JIGO_TTS_ENGINE=eleven` skips the
+  clone and uses the cloud voice for English replies (Gujarati lines are pre-rendered and
+  unaffected). Recording a demo on this laptop is exactly that case.
 
 - **Local-first storage.** ChromaDB keeps retrieval sub-100ms with zero network;
   only STT/TTS/LLM touch the cloud, and each has a fallback.
