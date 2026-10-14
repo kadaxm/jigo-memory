@@ -2,7 +2,7 @@
 import os
 import sys
 
-PROJECT = r"C:\Users\kadam\Documents\Jigo-memory"
+PROJECT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, PROJECT)
 os.chdir(PROJECT)
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")

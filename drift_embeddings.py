@@ -7,8 +7,8 @@ import os
 import sys
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-DIR = r"C:\Users\kadam\Documents\Jigo-memory\benchmarks\gujarati_indicemo_lite\drift_audio"
-OUTD = r"C:\Users\kadam\Documents\Jigo-memory\benchmarks\gujarati_indicemo_lite"
+DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "benchmarks", "gujarati_indicemo_lite", "drift_audio")
+OUTD = os.path.join(os.path.dirname(os.path.abspath(__file__)), "benchmarks", "gujarati_indicemo_lite")
 
 import librosa  # noqa: E402
 import numpy as np  # noqa: E402

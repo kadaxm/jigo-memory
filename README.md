@@ -10,6 +10,15 @@ LLM answer synthesis → streaming TTS. It runs as a premium web dashboard, a CL
 and an HTTP service — all on the same memory core — and publishes honest eval
 numbers for every claim.
 
+### Demo videos
+
+| | |
+|---|---|
+| **Latest — with rumik-oss-1** (Gujarati voice tier, emotional memory, calibrated answer gate) | [Watch on Google Drive](https://drive.google.com/file/d/1_7paochJs5va7n1ZplKXS6hjksn-hbeh/view?usp=sharing) |
+| Earlier iteration — the same project before the rumik-oss-1 integration | [Watch on LinkedIn](https://lnkd.in/p/d6bHv2jq) |
+
+*Earlier iteration, as a GIF:*
+
 ![Jigo live demo — a spoken question answered from memory in a cloned voice](assets/demo.gif)
 
 > 🎬 **Demo:** a real voice turn — *"when is my movie night?"* — answered from

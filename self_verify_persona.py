@@ -46,7 +46,7 @@ print(f"  uncle-register reply: {ok_reply}", flush=True)
 
 # 4. confirm nothing new stored (count check)
 import chromadb  # noqa: E402
-os.chdir(r"C:\Users\kadam\Documents\Jigo-memory")
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 c = chromadb.PersistentClient(path="./chroma_memory")
 col = [x for x in c.list_collections() if x.name == "memories"][0]
 n = col.count()

@@ -58,7 +58,7 @@ STATEMENTS = {
     ],
     "neutral": [
         "My meeting is at three tomorrow", "I take the 7:40 train to college", "The wifi password is in the notes app",
-        "I live in Ahmedabad", "Dr Mehta's clinic is near the temple", "My laptop has a 3050 GPU",
+        "I live in Jaipur", "Dr Mehta's clinic is near the temple", "My laptop has a 3050 GPU",
         "I need to buy milk on the way home", "The project report is due Friday", "My mother makes biryani on weekends",
         "I deployed my app on port eight thousand",
     ],

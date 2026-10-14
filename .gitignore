@@ -45,3 +45,7 @@ tts_samples/
 
 # harness caches
 gate_e2e_cache.json
+
+
+# editor lock files
+~$*

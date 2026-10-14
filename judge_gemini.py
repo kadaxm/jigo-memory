@@ -8,7 +8,7 @@ import sys
 import time
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-PROJECT = r"C:\Users\kadam\Documents\Jigo-memory"
+PROJECT = os.path.dirname(os.path.abspath(__file__))
 os.chdir(PROJECT)
 sys.path.insert(0, PROJECT)
 

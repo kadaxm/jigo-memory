@@ -32,7 +32,7 @@ t3_pass = d.get("reply_mode") is None and d.get("reply_text") is None
 # cleanup test memories (keep DB clean)
 print("\ncleaning test memories...", flush=True)
 import chromadb  # noqa: E402
-os.chdir(r"C:\Users\kadam\Documents\Jigo-memory")
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 c = chromadb.PersistentClient(path="./chroma_memory")
 col = [x for x in c.list_collections() if x.name == "memories"][0]
 for content in ["I am not feeling good today", "Bro, I finally fixed the bug and deployed today",

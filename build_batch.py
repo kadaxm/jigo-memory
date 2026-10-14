@@ -1,7 +1,7 @@
 import json
 import os
 
-os.chdir(r"C:\Users\kadam\Documents\Jigo-memory")
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 out = []
 with open("benchmarks/gujarati_indicemo_lite/prompts.jsonl", encoding="utf-8") as f:
     for line in f:

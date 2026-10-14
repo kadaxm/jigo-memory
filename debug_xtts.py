@@ -2,7 +2,7 @@ import os
 import traceback
 
 os.environ.setdefault("COQUI_TOS_AGREED", "1")
-os.chdir(r"C:\Users\kadam\Documents\Jigo-memory")
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 from TTS.api import TTS  # noqa: E402
 
 tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to("cuda")

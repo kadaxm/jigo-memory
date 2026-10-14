@@ -1,9 +1,13 @@
 # Gujarati IndicEmo-Lite — Methodology
 
 A preliminary extension of [IndicEmo](https://github.com/ira-rumik/IndicEmo)
-(Rumik AI, Apache-2.0) to **Gujarati** — a language rumik-oss 1 claims to support
-(22 languages) but which is absent from the published IndicEmo evaluation set
-(7 languages: EN, HI, TE, TA, KN, BN, PA).
+(Rumik AI, Apache-2.0) to **Gujarati**, which is absent from the published IndicEmo
+evaluation set (7 languages: EN, HI, TE, TA, KN, BN, PA). The rumik-oss 1 model card
+states 22 Indic languages plus English but does not list them, so Gujarati being among
+them is an assumption here; the rendered audio was intelligible and detected as Gujarati
+by Scribe, so it appears to work. "Gujarati accent" and "neutral" are free-text description
+values — neither is among the documented accents (Hindi, Telugu, Tamil, Kannada, Bengali,
+Punjabi, Indian English) or tones (happy, sad, angry, excited, professional).
 
 **Status: PRELIMINARY. Substituted judge panel. Not comparable to published scores.**
 

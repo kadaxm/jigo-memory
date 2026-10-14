@@ -10,7 +10,7 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 import httpx  # noqa: E402
 
 BASE = "http://127.0.0.1:8100"
-OUT = r"C:\Users\kadam\Documents\Jigo-memory\benchmarks\gujarati_indicemo_lite\xtts_audio"
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "benchmarks", "gujarati_indicemo_lite", "xtts_audio")
 os.makedirs(OUT, exist_ok=True)
 
 JOBS = [

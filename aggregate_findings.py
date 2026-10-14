@@ -6,7 +6,7 @@ import statistics
 import sys
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-BD = r"C:\Users\kadam\Documents\Jigo-memory\benchmarks\gujarati_indicemo_lite"
+BD = os.path.join(os.path.dirname(os.path.abspath(__file__)), "benchmarks", "gujarati_indicemo_lite")
 
 prompts = {}
 with open(os.path.join(BD, "prompts.jsonl"), encoding="utf-8") as f:

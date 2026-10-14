@@ -13,7 +13,7 @@ import soundfile as sf
 from transformers import AutoModelForCausalLM, AutoTokenizer, MimiModel, BitsAndBytesConfig
 
 REPO = "rumik-ai/rumik-oss-1"
-OUT = r"C:\Users\kadam\Documents\Jigo-memory\assets\rumik_samples\generated"
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "rumik_samples", "generated")
 os.makedirs(OUT, exist_ok=True)
 
 print("loading tokenizer...", flush=True)
